@@ -36,7 +36,7 @@
 
 // True parameters for data generation
 const TRUE_A = 0.4;
-const TRUE_B = 0.6;
+const TRUE_B = 0.3;
 
 // Visualization domains
 const xDomain = [-5, 5];
@@ -48,8 +48,8 @@ const yDomain = [-4, 4];
 const PARAM_RANGES = {
   aMin: 0.1,
   aMax: 0.7,
-  bMin: 0.3,
-  bMax: 0.9
+  bMin: 0.0,
+  bMax: 0.6
 };
 
 // Visualization dimensions and margins
@@ -648,6 +648,14 @@ function initAnnealedSGDViz() {
 
   const { aMin, aMax, bMin, bMax } = PARAM_RANGES;
 
+  // Helper to generate random starting position within valid ranges
+  function randomStartPosition() {
+    return {
+      a: aMin + Math.random() * (aMax - aMin),
+      b: bMin + Math.random() * (bMax - bMin)
+    };
+  }
+
   function render() {
     if (currentDataPoints.length === 0) return;
     g.selectAll('*').remove();
@@ -778,8 +786,15 @@ function initAnnealedSGDViz() {
 
   document.getElementById('asgdResetBtn').addEventListener('click', () => {
     asgdRunning = false;
-    asgdCurrent.a = parseFloat(document.getElementById('asgdA0').value);
-    asgdCurrent.b = parseFloat(document.getElementById('asgdB0').value);
+    // Generate new random starting position
+    const startPos = randomStartPosition();
+    asgdCurrent.a = startPos.a;
+    asgdCurrent.b = startPos.b;
+    // Update sliders to match
+    document.getElementById('asgdA0').value = startPos.a;
+    document.getElementById('asgdB0').value = startPos.b;
+    document.getElementById('asgdA0Value').textContent = startPos.a.toFixed(2);
+    document.getElementById('asgdB0Value').textContent = startPos.b.toFixed(2);
     asgdTrajectory = [{ a: asgdCurrent.a, b: asgdCurrent.b }];
     asgdHistory = [];
     const alpha0 = parseFloat(document.getElementById('asgdAlpha0').value);
@@ -926,7 +941,7 @@ function initLandscapeViz() {
   const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
   const meshPoints = 25;
-  const aMin = 0.1, aMax = 0.7, bMin = 0.3, bMax = 0.9;
+  const { aMin, aMax, bMin, bMax } = PARAM_RANGES;
 
   function render() {
     if (currentDataPoints.length === 0) return;
@@ -1041,7 +1056,7 @@ function initSingleStepViz() {
   svgLandscape.attr('viewBox', `0 0 ${width} ${height}`);
   svgAfter.attr('viewBox', `0 0 ${width} ${height}`);
 
-  const aMin = 0.1, aMax = 0.7, bMin = 0.3, bMax = 0.9;
+  const { aMin, aMax, bMin, bMax } = PARAM_RANGES;
 
   function renderLandscape(a0, b0, a1, b1, alpha) {
     svgLandscape.selectAll('*').remove();
@@ -1179,7 +1194,7 @@ function initBatchLandscapesViz() {
   const w = width - margin.left - margin.right;
   const h = height - margin.top - margin.bottom;
 
-  const aMin = 0.1, aMax = 0.7, bMin = 0.3, bMax = 0.9;
+  const { aMin, aMax, bMin, bMax } = PARAM_RANGES;
 
   function renderBatchLandscape(svg, batchPoints, a0, b0, batchNum, batchIndices) {
     svg.selectAll('*').remove();
@@ -1360,7 +1375,7 @@ function initGDViz() {
   svg.attr('viewBox', `0 0 ${width} ${height}`);
   const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-  const aMin = 0.1, aMax = 0.7, bMin = 0.3, bMax = 0.9;
+  const { aMin, aMax, bMin, bMax } = PARAM_RANGES;
   
   // Helper to generate random starting position within valid ranges
   function randomStartPosition() {
@@ -1498,7 +1513,15 @@ function initSGDViz() {
   svg.attr('viewBox', `0 0 ${width} ${height}`);
   const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-  const aMin = 0.1, aMax = 0.7, bMin = 0.3, bMax = 0.9;
+  const { aMin, aMax, bMin, bMax } = PARAM_RANGES;
+
+  // Helper to generate random starting position within valid ranges
+  function randomStartPosition() {
+    return {
+      a: aMin + Math.random() * (aMax - aMin),
+      b: bMin + Math.random() * (bMax - bMin)
+    };
+  }
 
   function render() {
     if (currentDataPoints.length === 0) return;
@@ -1577,8 +1600,15 @@ function initSGDViz() {
 
   document.getElementById('sgdResetBtn').addEventListener('click', () => {
     sgdRunning = false;
-    sgdCurrent.a = parseFloat(document.getElementById('sgdA0').value);
-    sgdCurrent.b = parseFloat(document.getElementById('sgdB0').value);
+    // Generate new random starting position
+    const startPos = randomStartPosition();
+    sgdCurrent.a = startPos.a;
+    sgdCurrent.b = startPos.b;
+    // Update sliders to match
+    document.getElementById('sgdA0').value = startPos.a;
+    document.getElementById('sgdB0').value = startPos.b;
+    document.getElementById('sgdA0Value').textContent = startPos.a.toFixed(2);
+    document.getElementById('sgdB0Value').textContent = startPos.b.toFixed(2);
     sgdTrajectory = [{ a: sgdCurrent.a, b: sgdCurrent.b }];
     sgdHistory = [];
     window.dispatchEvent(new Event('sgdUpdated'));
@@ -1631,7 +1661,7 @@ function createLearningCurvesViz(svgIds, historyGetter, eventName, algorithmName
   const gA = svgA.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
   const gB = svgB.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-  function renderPlot(g, data, yAccessor, yLabel, title) {
+  function renderPlot(g, data, yAccessor, yLabel, title, yBounds = null) {
     g.selectAll('*').remove();
 
     if (!data || data.length === 0) {
@@ -1644,9 +1674,16 @@ function createLearningCurvesViz(svgIds, historyGetter, eventName, algorithmName
     const maxLen = data.length;
     const xScale = d3.scaleLinear().domain([0, maxLen]).range([0, w]);
 
-    const allVals = data.map(yAccessor);
-    const yMin = d3.min(allVals) || 0;
-    const yMax = d3.max(allVals) || 1;
+    // Use fixed bounds if provided, otherwise compute from data
+    let yMin, yMax;
+    if (yBounds) {
+      yMin = yBounds.min;
+      yMax = yBounds.max;
+    } else {
+      const allVals = data.map(yAccessor);
+      yMin = d3.min(allVals) || 0;
+      yMax = d3.max(allVals) || 1;
+    }
     const yScale = d3.scaleLinear().domain([yMin, yMax]).range([h, 0]);
 
     g.append('g').attr('class', 'grid').attr('transform', `translate(0,${h})`)
@@ -1687,9 +1724,16 @@ function createLearningCurvesViz(svgIds, historyGetter, eventName, algorithmName
 
   function renderCurves() {
     const historyData = historyGetter();
-    renderPlot(gMSE, historyData, d => d.mse, 'MSE', 'Mean Squared Error');
-    renderPlot(gA, historyData, d => d.a, 'a', 'Parameter a (slope)');
-    renderPlot(gB, historyData, d => d.b, 'b', 'Parameter b (intercept)');
+    
+    // MSE: fixed min at 0, max from data
+    const mseMax = historyData.length > 0 ? d3.max(historyData, d => d.mse) || 1 : 1;
+    renderPlot(gMSE, historyData, d => d.mse, 'MSE', 'Mean Squared Error', { min: 0, max: mseMax });
+    
+    // Parameter a: fixed bounds from PARAM_RANGES
+    renderPlot(gA, historyData, d => d.a, 'a', 'Parameter a (slope)', { min: PARAM_RANGES.aMin, max: PARAM_RANGES.aMax });
+    
+    // Parameter b: fixed bounds from PARAM_RANGES
+    renderPlot(gB, historyData, d => d.b, 'b', 'Parameter b (intercept)', { min: PARAM_RANGES.bMin, max: PARAM_RANGES.bMax });
   }
 
   window.addEventListener(eventName, renderCurves);
@@ -1918,7 +1962,7 @@ function initGradientEvalViz() {
   svg.attr('viewBox', `0 0 ${width} ${height}`);
   const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-  const aMin = 0.1, aMax = 0.7, bMin = 0.3, bMax = 0.9;
+  const { aMin, aMax, bMin, bMax } = PARAM_RANGES;
 
   function render() {
     if (currentDataPoints.length === 0) return;

@@ -36,15 +36,15 @@
 
     <div class="section">
       <h2>The Data</h2>
-      <p>We generate N data points sampled near the line $y = 0.3x + 0.5$ + Gaussian noise.</p>
+      <p>We generate N data points sampled near the line $y = 0.3x + 0.3$ + Gaussian noise.</p>
       <div class="controls">
         <label class="control">
           <span>Number of points: <strong id="dataPointsValue">5</strong></span>
           <input id="dataPoints" type="range" min="1" max="10" step="1" value="7" aria-label="Number of data points">
         </label>
         <label class="control">
-          <span>Noise σ: <strong id="noiseSigmaValue">0.8</strong></span>
-          <input id="noiseSigma" type="range" min="0" max="1.2" step="0.1" value="0.8" aria-label="Noise standard deviation">
+          <span>Noise σ: <strong id="noiseSigmaValue">0.6</strong></span>
+          <input id="noiseSigma" type="range" min="0" max="1.1" step="0.1" value="0.6" aria-label="Noise standard deviation">
         </label>
         <button id="sampleDataBtn" type="button" aria-label="Generate new data sample">Sample Data</button>
       </div>
@@ -229,8 +229,8 @@
           <input id="gradEvalA" type="range" min="0.1" max="0.7" step="0.01" value="0.5">
         </label>
         <label class="control">
-          <span>b: <strong id="gradEvalBValue">0.4</strong></span>
-          <input id="gradEvalB" type="range" min="0.3" max="0.9" step="0.01" value="0.6">
+          <span>b: <strong id="gradEvalBValue">0.5</strong></span>
+          <input id="gradEvalB" type="range" min="0.0" max="0.6" step="0.01" value="0.5">
         </label>
       </div>
       <div class="viz">
@@ -291,8 +291,8 @@
           <input id="stepA0" type="range" min="0.1" max="0.7" step="0.01" value="0.60">
         </label>
         <label class="control">
-          <span>Initial b: <strong id="stepB0Value">0.85</strong></span>
-          <input id="stepB0" type="range" min="0.3" max="0.9" step="0.01" value="0.85">
+          <span>Initial b: <strong id="stepB0Value">0.5</strong></span>
+          <input id="stepB0" type="range" min="0.0" max="0.6" step="0.01" value="0.5">
         </label>
         <label class="control">
           <span>Learning rate α: <strong id="stepAlphaValue">0.08</strong></span>
@@ -333,8 +333,8 @@
           <input id="gdA0" type="range" min="0.1" max="0.7" step="0.01" value="0.5">
         </label>
         <label class="control">
-          <span>Initial b: <strong id="gdB0Value">0.5</strong></span>
-          <input id="gdB0" type="range" min="0.3" max="0.9" step="0.01" value="0.5">
+          <span>Initial b: <strong id="gdB0Value">0.3</strong></span>
+          <input id="gdB0" type="range" min="0.0" max="0.6" step="0.01" value="0.3">
         </label>
         <label class="control">
           <span>Iterations: <strong id="gdIterValue">100</strong></span>
@@ -469,8 +469,8 @@
           <input id="sgdA0" type="range" min="0.1" max="0.7" step="0.01" value="0.15">
         </label>
         <label class="control">
-          <span>Initial b: <strong id="sgdB0Value">0.8</strong></span>
-          <input id="sgdB0" type="range" min="0.3" max="0.9" step="0.01" value="0.8">
+          <span>Initial b: <strong id="sgdB0Value">0.5</strong></span>
+          <input id="sgdB0" type="range" min="0.0" max="0.6" step="0.01" value="0.5">
         </label>
         <label class="control">
           <span>Iterations: <strong id="sgdIterValue">5</strong></span>
@@ -517,7 +517,7 @@
       </ul>
       <details class="hint-dropdown">
         <summary>💡 Hint</summary>
-        <p>Try to change the hyperparameters during training.</p>
+        <p>Try to change the hyperparameters and press the "Run" button again. Observe the learning curves.</p>
          </details>
 
     </div>
@@ -539,8 +539,8 @@
           <input id="batchA0" type="range" min="0.1" max="0.7" step="0.01" value="0.45">
         </label>
         <label class="control">
-          <span>Starting b: <strong id="batchB0Value">0.50</strong></span>
-          <input id="batchB0" type="range" min="0.3" max="0.9" step="0.01" value="0.50">
+          <span>Starting b: <strong id="batchB0Value">0.3</strong></span>
+          <input id="batchB0" type="range" min="0.0" max="0.6" step="0.01" value="0.3">
         </label>
         <label class="control">
           <span>Batch size: <strong id="batchSizeValue">3</strong></span>
@@ -603,12 +603,12 @@
           <input id="asgdBatch" type="range" min="1" max="10" step="1" value="3">
         </label>
         <label class="control">
-          <span>Initial a: <strong id="asgdA0Value">0.25</strong></span>
-          <input id="asgdA0" type="range" min="0.1" max="0.7" step="0.01" value="0.25">
+          <span>Initial a: <strong id="asgdA0Value">0.5</strong></span>
+          <input id="asgdA0" type="range" min="0.1" max="0.7" step="0.01" value="0.5">
         </label>
         <label class="control">
-          <span>Initial b: <strong id="asgdB0Value">0.35</strong></span>
-          <input id="asgdB0" type="range" min="0.3" max="0.9" step="0.01" value="0.5">
+          <span>Initial b: <strong id="asgdB0Value">0.5</strong></span>
+          <input id="asgdB0" type="range" min="0.0" max="0.6" step="0.01" value="0.5">
         </label>
         <label class="control">
           <span>Iterations: <strong id="asgdIterValue">500</strong></span>
