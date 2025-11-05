@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stochastic Gradient Descent Tutorial</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <script>window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']] } };</script>
+  <script defer src="main.js"></script>
+  <meta name="description" content="Interactive SGD tutorial: Data, Model, Loss, and Optimizer.">
+</head>
+<body>
+  <div class="app">
+    <h1>Stochastic Gradient Descent Tutorial</h1>
+    <div class="section overview">
+      <p>
+        The goal of this tutorial is to introduce the <em>Gradient Descent</em> algorithm and its variants.
+        We assume you are familiar with <em>Linear Regression</em> and with the concept of the <em>Mean Squared Error (MSE).</em>        
+      </p>
+    </div>
+    <div class="section intro">
+      <h2>The machine learning problem</h2>
+      <p>When solving a machine-learning problem, we always find four main 'ingredients': <strong>Data</strong>, <strong>Model</strong>, <strong>Cost (Loss)</strong>, and the <strong>Optimizer</strong>.
+      In this tutorial we focus on the optimizer and keep the other ingredients as simple as possible.
+      </p>
+      <ul>
+        <li><strong>Data</strong>: We generate 2-dimensional points with a linear relationship and add Gaussian noise to them.</li>
+        <li><strong>Model</strong>: We use a linear function (line equation) $\hat{y} = a \cdot x + b$ to predict the target variable $y$ for a new input $x$.</li>
+        <li><strong>Cost (Loss)</strong>: The goal is to minimize the Mean Squared Error (MSE).</li>
+        <li><strong>Optimizer</strong>: We introduce an iterative optimization algorithm: Stochastic Gradient Descent (SGD)</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>The Data</h2>
+      <p>We generate N data points sampled near the line $y = 0.3x + 0.5$ + Gaussian noise.</p>
+      <div class="controls">
+        <label class="control">
+          <span>Number of points: <strong id="dataPointsValue">5</strong></span>
+          <input id="dataPoints" type="range" min="1" max="10" step="1" value="7">
+        </label>
+        <label class="control">
+          <span>Noise σ: <strong id="noiseSigmaValue">0.8</strong></span>
+          <input id="noiseSigma" type="range" min="0" max="1.2" step="0.1" value="0.8">
+        </label>
+        <button id="sampleDataBtn" type="button">Sample Data</button>
+      </div>
+      <div class="viz">
+        <svg id="viz-data" width="760" height="400"></svg>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>The Model</h2>
+      <p>The goal of the model is to predict $\hat{y}$ for a new $x$. Here, we use a linear model: $\hat{y} = a \cdot x + b$.
+      </p>
+      <div class="viz">
+        <svg id="viz-model" width="760" height="520"></svg>
+      </div>
+      <div class="controls">
+        <label class="control">
+          <span>a (slope): <strong id="modelAValue">0.4</strong></span>
+          <input id="modelA" type="range" min="-1.5" max="2.0" step="0.01" value="-0.1">
+        </label>
+        <label class="control">
+          <span>b (intercept): <strong id="modelBValue">0.6</strong></span>
+          <input id="modelB" type="range" min="-1.0" max="1.5" step="0.01" value="1.0">
+        </label>
+      </div>
+
+    </div>
+
+    <div class="section exercise">
+      <h3>Exercise</h3>
+      <p>
+        Use the sliders to change the model parameters <strong>a</strong> (slope) and <strong>b</strong> (intercept). 
+        Try to visually fit the optimal line to the data.
+        <br>
+        What criteria did you use to fit the line to the data? Can a computer do it the same way?
+      </p>
+    </div>
+
+
+    <div class="section">
+      <h2>Optimization and the Loss Function</h2>
+      <p>Optimization algorithms aim to determine the input variables (here a and b) that minimize (or maximize) a specified objective function.
+      In the context of machine learning, the objective function is typically called <em>loss</em> function. Other common terms are  <em>cost</em> or  <em>error</em>.</p>
+      The loss function used in linear regression is the <em>Mean Squared Error (MSE)</em> (here divided by 2 for reasons that become clear later):
+
+      <p>$$MSE = \frac{1}{2N}\sum_{i=1}^N (y_i - (a \cdot x_i + b))^2$$</p>
+
+    </div>
+
+    <div class="section exercise">
+      <h2>Interactive MSE Minimization</h2>
+      Toggle "Show residuals" and see a visual representation of the error.
+      The red vertical lines show residuals $e_i = y_i - \hat{y}_i$, and the red squares illustrate $e_i^2$.
+      <ul>
+      <li>Use the sliders to adjust $a$ and $b$ and try to minimize the MSE.</li>
+      <li>Compare the model parameters a and b with the values you found in the previous exercise</li>
+    </ul>
+      Observe: The only important quantity is the MSE. Given the loss function, we do not need a visualization of the data and the model line.
+      
+      </p>
+      <div class="controls">
+        <label class="control">
+          <span>a (slope): <strong id="modelAMinValue">0.4</strong></span>
+          <input id="modelAMin" type="range" min="-1.5" max="2.0" step="0.01" value="-0.1">
+        </label>
+        <label class="control">
+          <span>b (intercept): <strong id="modelBMinValue">0.6</strong></span>
+          <input id="modelBMin" type="range" min="-1.0" max="1.5" step="0.01" value="1.0">
+        </label>
+        <label class="control">
+          <input id="showResidualsSquaresMinimization" type="checkbox">
+          <span>Show residuals and squares</span>
+        </label>
+      </div>
+      <div class="viz">
+        <svg id="viz-model-minimization" width="760" height="520"></svg>
+      </div>
+    </div>
+
+    <div class="section exercise">
+      <h3>Exercise</h3>
+      <p>If you had to implement a function <code>calc_mse(?)</code> that calculates the MSE , what would be the input parameters?</p>
+      <details class="hint-dropdown">
+        <summary>💡 Answer</summary>
+        <h3><strong>The approximation-error (Loss) is a function of the model parameters AND the data</strong></h3>
+        <p>Using a linear model with two parameters, a and b, the error E is a function of four parameters: $E=f(X, Y, a, b)$. Other definitions are also possible, for example <code>E=f(data_matrix, param_vector)</code>.
+          Inside <code>calc_mse()</code> an implementation of the model and the MSE are also needed.
+          <br>
+        As the data and the model are given (fixed), the only <em>variables</em> are the parameters a and b.
+      </p>
+
+      </details>
+    </div>
+
+    <div class="section">
+      <h2>The Loss Landscape</h2>
+      For a simple two-parameter model, we can visualize the (color coded) loss at each location (a,b) of the parameter space. 
+      This plot is called <em>Error Landscape</em> or <em>Loss Landscape</em>.
+      We can use this 2D plot to read out the MSE for any model parameters (a,b). Hover the mouse over the plot.
+
+      <div class="viz">
+        <svg id="viz-landscape" width="840" height="520"></svg>
+      </div>
+      <div class="metrics">
+        <span>Mouse: a = <strong id="landscapeMouseA">—</strong>, b = <strong id="landscapeMouseB">—</strong>, MSE = <strong id="landscapeMouseMSE">—</strong></span>
+      </div>
+    </div>
+
+    <div class="section exercise">
+      <h3>Exercise</h3>
+      <p><strong>Q1:</strong> For each of the following 3 linear models, read the Mean Squared Error from the graph above:</p>
+      <ul>
+        <li>linear model #1: $y = 0.7x + 0.8$</li>
+        <li>linear model #2: $y = 0.5x + 0.4$</li>
+        <li>linear model #3: $y = 0.2x + 0.6$</li>
+      </ul>
+      <p><strong>Q2:</strong> Can we find a linear function for which the error goes to zero?</p>
+      <p><strong>Q3:</strong> The 2D plot was created by calculating the MSE at many points of a grid. Assume a resolution of 0.02 for a and b, and estimate how many times error function was called.</p>
+      <p><strong>Q4:</strong> Would it be a good idea to just always calculate all those points on the grid, and then select the location (parameters) with the minimum error?</p>
+    
+      <details class="hint-dropdown">
+        <summary>💡 Comments/Answers</summary>
+        <p>Q1: It is important to understand that every point in the error landscape corresponds to a different model (a different line, defined by a and b). 
+        </p>
+        <p>Q2: MSE=0 would imply that all points exactly lie on a line, which is not generally the case.</p>
+        <p>Q3, Q4: If we are given a plot of the error landscape, it is easy to estimate the best fitting parameters: we simply pick the location [a,b] with the smallest MSE.
+          But computing this error-landscape is expensive! Even for the simple example here, the error was evaluated at thousands of [a,b]-locations. Furthermore, it was necessary to predefine the search-area and a resolution for the grid.</p>
+      </details>
+
+    </div>
+
+    <div class="section">
+      <h2>The Intuition behind Gradient Descent</h2>
+        <p><strong>Imagine you place a ball anywhere on the landscape. The ball will roll down the slope of the landscape and stop at the location with the smallest error.</strong> </p>
+        <p>We can formulate this intuitive approach more technically:</p>
+        <p><strong>We pick a starting point [a,b] randomly. Then we move a (small) step downhill. This is the direction in the parameter space where the error changes the fastest; mathematician call that direction the <em>gradient</em>.
+          At the new location, we calculate again the gradient and make a small step. This procedure is repeated until a termination criteria is met. </strong></p>
+        <p>This iterative procedure is, informally, the <strong>Gradient Descent</strong> algorithm. 
+          The method is efficient, because we do not perform a calculation at unnecessarily many location over the entire landscape. 
+    </div>
+
+
+    <div class="section">
+      <h2>The Gradient</h2>
+      <p>For the Gradient Descent algorithm, we need the direction (in the a, b plane) of the <em>fastest change</em> (change of the loss). This direction is given by the vector of partial derivatives:</p>
+      <p>$$\text{Gradient of E} = \begin{bmatrix} \frac{\partial E}{\partial a} \\ \frac{\partial E}{\partial b} \end{bmatrix}$$</p>
+            
+
+      <p>$$E = \frac{1}{2N}\sum_{i=1}^N (y_i - (a \cdot x_i + b))^2$$</p>
+
+    </div>
+
+
+    <div class="section exercise">
+      <h3>Exercise</h3>
+      <p><strong>Q1.</strong> Refresh your knowledge about gradients. (For example <a href="https://en.wikipedia.org/wiki/Gradient" target="_blank">here</a>)</p>
+      <p><strong>Q2.</strong> Calculate partial derivatives of the MSE. Note: If this looks difficult, start with N=1, that is, assume there's a single datum $(x_j, y_j)$. Don't forget the chain rule.</p>
+   
+   
+      <details class="hint-dropdown">
+        <summary>💡 Solution: The Gradient of the MSE</summary>
+        <p>
+          $$
+          \begin{align}
+              \frac{\partial E}{\partial a} &= \frac{1}{N}\sum_{i=1}^N (y_i - (a \cdot x_i + b)) (-x_i) \\
+              \frac{\partial E}{\partial b} &= \frac{1}{N}\sum_{i=1}^N (y_i - (a \cdot x_i + b)) (-1)
+          \end{align}
+          $$
+        </p>
+        Note: The factor 1/2 in the MSE is canceled by the factor 2 when calculating the partial derivatives.
+        </details>
+      </div>
+
+
+
+    <div class="section">
+      <h2>Evaluating the Gradient</h2>
+      <p>The following plot visualizes the gradient vector at a given location.</p>
+      <div class="controls">
+        <label class="control">
+          <span>a: <strong id="gradEvalAValue">0.5</strong></span>
+          <input id="gradEvalA" type="range" min="0.1" max="0.7" step="0.01" value="0.5">
+        </label>
+        <label class="control">
+          <span>b: <strong id="gradEvalBValue">0.4</strong></span>
+          <input id="gradEvalB" type="range" min="0.3" max="0.9" step="0.01" value="0.6">
+        </label>
+      </div>
+      <div class="viz">
+        <svg id="viz-gradient-eval" width="760" height="520"></svg>
+      </div>
+      <div class="metrics">
+        <span>$\frac{\partial E}{\partial a}$= <strong id="gradEvalDa">0.000</strong></span>
+        <span>$\frac{\partial E}{\partial b}$= <strong id="gradEvalDb">0.000</strong></span>
+      </div>
+    </div>
+
+    <div class="section exercise">
+      <h2>Exercise</h2>
+      <p><strong>Q1:</strong>Use the figure above to understand the gradient. Use the sliders to move the location. Note your observations</p>
+
+      <details class="hint-dropdown">
+        <summary>💡 Comments</summary>
+        <p><strong>1)</strong> By definition, the gradient is a vector that points to the direction of fastest GROWTH. Following the gradient, we would move uphill, in the direction of increasing loss. For Gradient <strong>Descent</strong> we have to flip the sign of the vector.
+        <p><strong>2)</strong> The step is very large. When a step is too long, it may happen that instead of moving down the hill, we land on the other side of a valley where the loss is higher than at the starting point. The solution is to scale it down the length of the vector. The optimal scaling factor depends on the problem at hand. The scaling factor is typically called <strong><em>learning rate</em></strong>. Often the symbol $\alpha$ or $\eta$ is used to denote it.</p>
+        <p><strong>3)</strong> The gradient is a vector that is orthogonal to the contour lines of the loss function.</p>
+        <p><strong>4)</strong> The gradient provides information about the location (a,b). It does not point to the mimimum of the loss.</p>
+        <p><strong>5)</strong> At the location of the optimal solution, (the minimum of the loss), the gradient vanishes.</p>
+
+        </details>
+
+    </div>
+
+    <div class="section">
+      <h2>A Single Gradient Descent Step</h2>
+      The gradient descent update rule defines how to update the parameter vector [a, b] in a single iteration:
+      <p>
+        $$
+        \begin{align}
+           \begin{bmatrix}
+                   a \\
+                   b \\
+                 \end{bmatrix}_{t+1} 
+                 =    \begin{bmatrix}
+                   a \\
+                   b \\
+                 \end{bmatrix}_{t} - \alpha 
+                 \begin{bmatrix}
+                   \frac{\partial E}{\partial a} \\
+                   \frac{\partial E}{\partial b} \\
+                 \end{bmatrix} \Big\rvert _{\begin{bmatrix}
+                   a \\
+                   b \\
+                 \end{bmatrix}_{t} }
+        \end{align}
+        $$
+      </p>
+      <p>The vertical bar at the right of the gradient indicates that the gradient is evaluated at the location $[a,b]_t$</p>
+
+      <p>The following visualization shows the update rule in action</p>
+      <div class="controls">
+        <label class="control">
+          <span>Initial a: <strong id="stepA0Value">0.60</strong></span>
+          <input id="stepA0" type="range" min="0.1" max="0.7" step="0.01" value="0.60">
+        </label>
+        <label class="control">
+          <span>Initial b: <strong id="stepB0Value">0.85</strong></span>
+          <input id="stepB0" type="range" min="0.3" max="0.9" step="0.01" value="0.85">
+        </label>
+        <label class="control">
+          <span>Learning rate α: <strong id="stepAlphaValue">0.08</strong></span>
+          <input id="stepAlpha" type="range" min="0.0" max="1.0" step="0.01" value="0.10">
+        </label>
+      </div>
+      <div class="step-grid">
+        <div class="viz">
+          <svg id="viz-step-before" width="360" height="320"></svg>
+        </div>
+        <div class="viz">
+          <svg id="viz-step-landscape" width="360" height="320"></svg>
+        </div>
+        <div class="viz">
+          <svg id="viz-step-after" width="360" height="320"></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="section exercise">
+      <h2>Exercise</h2>
+      <ul>
+        <li>Use the sliders and try different start locations and different learning rates.</li>
+        <li>Find a combination of a,b, and $\alpha$ for which the MSE is increasing instead of decreasing.</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>The Optimizer: Gradient Descent</h2>
+      <p>We now pack the update step into a loop and obtain the <strong>Gradient Descent Algorithm</strong>: iteratively update the model parameters until some stopping criterium is met.</p>
+      <div class="controls">
+        <label class="control">
+          <span>Learning rate α: <strong id="gdAlphaValue">0.040</strong></span>
+          <input id="gdAlpha" type="range" min="0.001" max="0.15" step="0.001" value="0.04">
+        </label>
+        <label class="control">
+          <span>Initial a: <strong id="gdA0Value">0.5</strong></span>
+          <input id="gdA0" type="range" min="0.1" max="0.7" step="0.01" value="0.5">
+        </label>
+        <label class="control">
+          <span>Initial b: <strong id="gdB0Value">0.5</strong></span>
+          <input id="gdB0" type="range" min="0.3" max="0.9" step="0.01" value="0.5">
+        </label>
+        <label class="control">
+          <span>Iterations: <strong id="gdIterValue">100</strong></span>
+          <input id="gdIterations" type="range" min="1" max="500" step="1" value="100">
+        </label>
+        <div class="control buttons">
+          <button id="gdStepBtn" type="button">Single Step</button>
+          <button id="gdRunBtn" type="button">Run Gradient Descent</button>
+          <button id="gdResetBtn" type="button">Reset</button>
+        </div>
+      </div>
+      <div class="viz">
+        <svg id="viz-gd" width="760" height="520"></svg>
+      </div>
+      <div class="metrics">
+        <span>Current MSE: <strong id="gdMseValue">0.000</strong></span>
+        <span>Current a: <strong id="gdCurrentA">0.500</strong></span>
+        <span>Current b: <strong id="gdCurrentB">0.500</strong></span>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Learning Curves</h2>
+      <p>The learning curve shows how the MSE decreases. Additionally the evolution of the model parameters a and b during training is shown:</p>
+      <div class="curves-grid">
+        <div class="viz">
+          <svg id="viz-curves-gd-mse" width="360" height="280"></svg>
+        </div>
+        <div class="viz">
+          <svg id="viz-curves-gd-a" width="360" height="280"></svg>
+        </div>
+        <div class="viz">
+          <svg id="viz-curves-gd-b" width="360" height="280"></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Exercise</h2>
+      <ul>
+        <li>Try different learning rates (e.g., 0.001, 0.1, 0.2).</li>
+        <li>Try different numbers of iterations and initial values $(a_0,b_0)$.</li>
+        <li>Discuss possible stopping criteria.</li>
+      </ul>
+    </div>
+
+    <div class="section exercise">
+      <h3>Exercise</h3>
+      <p>Look at the loss function plotted below. It is a constructed example. Imagine the figure showed the error-landscape of a two-parameter-model fitted to some data.</p>
+      <ul>
+        <li>What problem do you identify, when applying Gradient Descent?</li>
+        <li>Discuss the problem and try to come up with a solution.</li>
+      </ul>
+      <div class="viz" style="margin-top: 16px;">
+        <svg id="viz-complex-loss" width="840" height="520"></svg>
+      </div>
+
+
+      <details class="hint-dropdown">
+        <summary>💡 Comments</summary>
+        <ul>
+          <li><strong>Gradient Descent stops at a local minimum.</strong> There's no guarantee to find a/the <strong>global minimum</strong>.</li>
+          <li>A possible solution is to run the algorithm multiple times from different initial values.</li>
+      </ul>
+        </details>
+
+    </div>
+
+    <div class="section">
+      <h2>(Almost) Done!</h2>
+      <div class="callout-box important">
+        <p><strong>Congratulations!</strong> You have now a solid understanding of the <strong>Gradient Descent</strong> optimization method.</p>
+        <p>But what is <strong><em>Stochastic</em></strong> <strong>Gradient Descent</strong>?</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Approximating the Gradient</h2>
+      <p>In the example above, we used only a few data points. When evaluating the gradient of the loss function, we were taking into account all data. 
+        Imagine we were given $N=100'000$ datapoints. Then, at each iteration, we would have to iterate over all $N=100'000$ points to calculate the gradient of the loss function.
+        This is computationally expensive. But ask yourself: how much would the gradient change, if we used only $N=99'999$ points? or $N=1'000$? or in the extreme case of $N=1$?
+        Would the optimizer still move downhill?
+      </p> 
+      <div class="callout-box important">
+        <p><strong>The idea behind Stochastic Gradient Descent (SGD) is that we do not need the <em>exact</em> gradient to find a trajectory toward the minimum. 
+          Instead, at each iteration we can randomly pick a few datapoints and use them to calculate an <em>approximation</em> of the gradient </strong>
+          (As long as we move more or less downhill, the algorithm still works). On average, over many iterations, the errors introduced by approximating the gradient, will average out. 
+          There is a trade-off: the algorithm needs more and shorter steps (because it takes some "detours"), but each step is computationally cheaper (faster).
+        </p>
+      </div>
+      <p>The number of calculations needed to obtain the gradient vector is proportional to the number of data points $N$. 
+        We use the symbol $J_n$ to denote a set of $n$ indices, randomly chosen from the interval [1 N]. 
+        In the case of $n=1$ (a single randomly chosen index $j$), the equation simplifies:</p>
+      <p>
+        $$
+        \begin{align}
+        \textrm{E} &= \frac{1}{2N} \sum_{i=1}^{N} (y_i - (a \cdot x_i + b))^2 \\[20pt]
+        \frac{\partial \textrm{E}}{\partial a} &= \frac{1}{N} \sum_{i=1}^{N} (y_i - (a \cdot x_i + b)) (-x_i) \\
+        &\approx \frac{1}{n} \sum_{j \in J_n} (y_j - (a \cdot x_j + b)) (-x_j)  \\
+        \frac{\partial E_j}{\partial a} &= (y_j - (a \cdot x_j + b)) (-x_j) \\[20pt] 
+        \frac{\partial \textrm{E}}{\partial b} &= \frac{1}{N} \sum_{i=1}^{N} (y_i - (a \cdot x_i + b)) (-1) \\
+        &\approx \frac{1}{n} \sum_{j \in J_n} (y_{j} - (a \cdot x_{j} + b)) (-1)  \\
+        \frac{\partial E_j}{\partial b} &= (y_{j} - (a \cdot x_{j} + b)) (-1)
+        \end{align}
+        $$
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>Stochastic Gradient Descent (SGD)</h2>
+      <p>Unlike Gradient Descent, SGD does not use the true gradient but an approximation using a <strong>batch</strong> of randomly selected data points.
+      The optimal batch size depends on many factors, for example on the model, the data, the hardware. A typical batchsize used to solve textbook examples is N=32.
+      If a batch is much smaller than the original dataset, it is called <em>minibatch</em>. 
+      Only the extreme case of $N=1$ is called SGD by some authors. In practice, the terms Batch Gradient Descent and Stochastic Gradient Descent are used interchangeably.
+      </p>
+      The following animation lets you explore the effect of batch size and learning rate. 
+      You can modify both hyperparameters during the optimization.
+      <p>
+
+      </p>
+      <div class="controls">
+        <label class="control">
+          <span>Learning rate α: <strong id="sgdAlphaValue">0.010</strong></span>
+          <input id="sgdAlpha" type="range" min="0.0" max="0.10" step="0.001" value="0.01">
+        </label>
+        <label class="control">
+          <span>Batch size n: <strong id="sgdBatchValue">3</strong></span>
+          <input id="sgdBatch" type="range" min="1" max="10" step="1" value="3">
+        </label>
+        <label class="control">
+          <span>Initial a: <strong id="sgdA0Value">0.15</strong></span>
+          <input id="sgdA0" type="range" min="0.1" max="0.7" step="0.01" value="0.15">
+        </label>
+        <label class="control">
+          <span>Initial b: <strong id="sgdB0Value">0.8</strong></span>
+          <input id="sgdB0" type="range" min="0.3" max="0.9" step="0.01" value="0.8">
+        </label>
+        <label class="control">
+          <span>Iterations: <strong id="sgdIterValue">5</strong></span>
+          <input id="sgdIterations" type="range" min="1" max="200" step="1" value="5">
+        </label>
+        <div class="control buttons">
+          <button id="sgdStepBtn" type="button">Single Step</button>
+          <button id="sgdRunBtn" type="button">Run SGD</button>
+          <button id="sgdResetBtn" type="button">Reset</button>
+        </div>
+      </div>
+      <div class="viz">
+        <svg id="viz-sgd" width="760" height="520"></svg>
+      </div>
+      <div class="metrics">
+        <span>Current MSE: <strong id="sgdMseValue">0.000</strong></span>
+        <span>Current a: <strong id="sgdCurrentA">0.400</strong></span>
+        <span>Current b: <strong id="sgdCurrentB">0.500</strong></span>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Learning Curve for SGD</h2>
+      <div class="curves-grid">
+        <div class="viz">
+          <svg id="viz-curves-sgd-mse" width="360" height="280"></svg>
+        </div>
+        <div class="viz">
+          <svg id="viz-curves-sgd-a" width="360" height="280"></svg>
+        </div>
+        <div class="viz">
+          <svg id="viz-curves-sgd-b" width="360" height="280"></svg>
+        </div>
+      </div>
+    </div>
+
+
+    <div class="section exercise">
+      <h3>Exercise</h3>
+      <p>When running SGD we notice that the algorithm does not converge and the point keeps jumping around the minimum.
+        We see this fluctuation also when inspecting the learning curve.</p>
+      <ul>
+        <li>Do you have an idea how this problem could be solved?</li>
+      </ul>
+      <details class="hint-dropdown">
+        <summary>💡 Hint</summary>
+        <p>Try to change the hyperparameters during training.</p>
+         </details>
+
+    </div>
+
+<div class="section">
+      <h2>The loss landscape of different batches</h2>
+      <p>It can be confusing to see SGD jumping around (even moving uphill) while the error landscape looks smooth.
+        The reason is that the error landscape shown above is not the same landscape actually used by SGD.
+        At every iteration, SGD samples a different batch and therefore the error landscape is changing at each iteration. 
+        In other words even in SGD the vector always points downhill, but that error landscape is usually not visualized.
+        <br>
+        Here we fill that gap and visualize the error landscape for three different random subsets of the given data (random batches). 
+        Note that we add the same point (a0, b0) to each of the three figures and show the respective gradients.</p>
+      
+          
+      <div class="controls">
+        <label class="control">
+          <span>Starting a: <strong id="batchA0Value">0.45</strong></span>
+          <input id="batchA0" type="range" min="0.1" max="0.7" step="0.01" value="0.45">
+        </label>
+        <label class="control">
+          <span>Starting b: <strong id="batchB0Value">0.50</strong></span>
+          <input id="batchB0" type="range" min="0.3" max="0.9" step="0.01" value="0.50">
+        </label>
+        <label class="control">
+          <span>Batch size: <strong id="batchSizeValue">3</strong></span>
+          <input id="batchSizeViz" type="range" min="1" max="5" step="1" value="3">
+        </label>
+        <button id="batchUpdateBtn" type="button">Sample new Batches</button>
+      </div>
+      <div class="batch-grid">
+        <div class="viz">
+          <svg id="viz-batch-1" width="360" height="320"></svg>
+        </div>
+        <div class="viz">
+          <svg id="viz-batch-2" width="360" height="320"></svg>
+        </div>
+        <div class="viz">
+          <svg id="viz-batch-3" width="360" height="320"></svg>
+        </div>
+      </div>
+
+      <div class="callout-box result">
+        <p>Remember: The loss depends on the parameter <b>and the data</b>. 
+          Each time a different batches is sampled, the loss landscapes changes!</p>
+          <p>The plot illustrates that for different batches the gradient points to different directions. 
+            The gradient is exact with respect to the batch and points downhill in all 3 examples.
+            When those vectors are drawn on the original landscape (using all data), it seems "as if the ball was not rolling downhill".
+            <br>
+          Note: at every iteration of SGD, only one batch is sampled (not 3 like in this illustration)</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Stochastic Gradient Descent with annealed learning rate</h2>
+      <p>
+        We have seen that, for a fixed learning rate $\alpha$, SGD does not converge. Instead, the algorithm keeps fluctuating around the minimum. 
+        One can set $\alpha$ to a very small value, in which case the fluctuations are smaller and SGD stays 'close enough' to the minimum during the 'late iterations'. 
+        Therefore, in order to obtain a result of high accuracy, one would choose a very <b>small $\alpha$</b>.
+        During the 'early iterations', the situation is different: There is no benefit staying close to the optimal trajectory. As long as SGD moves roughly in the direction toward the minimum, fluctuations (even relatively large ones) around the 'optimal' trajectory are acceptable. 
+        One would therefore choose a <b>large $\alpha$</b> in order to improve the speed of the algorithm.
+        <br>
+        Annealing solves this appearent contradiction by adapting the learning rate. It starts with a large $\alpha$ and reduces it over time. 
+        There are many options (so called schedules) how one can reduce the learning rate over time. 
+        Here we decay the learning rate by multiplying it at each iteration by a decay factor:
+        $\alpha_{t+1} = \max(\alpha_t \cdot \text{anneal}, \text{lower bound})$
+      </p>
+      <div class="controls">
+        <label class="control">
+          <span>Initial α: <strong id="asgdAlpha0Value">0.050</strong></span>
+          <input id="asgdAlpha0" type="range" min="0.001" max="0.2" step="0.001" value="0.05">
+        </label>
+        <label class="control">
+          <span>Annealing factor: <strong id="asgdAnnealValue">0.990</strong></span>
+          <input id="asgdAnneal" type="range" min="0.90" max="1.00" step="0.001" value="0.99">
+        </label>
+        <label class="control">
+          <span>Lower bound: <strong id="asgdLowerValue">0.0010</strong></span>
+          <input id="asgdLower" type="range" min="0.0001" max="0.05" step="0.0001" value="0.001">
+        </label>
+        <label class="control">
+          <span>Batch size n: <strong id="asgdBatchValue">3</strong></span>
+          <input id="asgdBatch" type="range" min="1" max="10" step="1" value="3">
+        </label>
+        <label class="control">
+          <span>Initial a: <strong id="asgdA0Value">0.25</strong></span>
+          <input id="asgdA0" type="range" min="0.1" max="0.7" step="0.01" value="0.25">
+        </label>
+        <label class="control">
+          <span>Initial b: <strong id="asgdB0Value">0.35</strong></span>
+          <input id="asgdB0" type="range" min="0.3" max="0.9" step="0.01" value="0.5">
+        </label>
+        <label class="control">
+          <span>Iterations: <strong id="asgdIterValue">500</strong></span>
+          <input id="asgdIterations" type="range" min="1" max="2000" step="1" value="500">
+        </label>
+        <div class="control buttons">
+          <button id="asgdStepBtn" type="button">Single Step</button>
+          <button id="asgdRunBtn" type="button">Run ASGD</button>
+          <button id="asgdResetBtn" type="button">Reset</button>
+        </div>
+      </div>
+      <div class="viz">
+        <svg id="viz-asgd" width="760" height="520"></svg>
+      </div>
+      <div class="metrics">
+        <span>Current MSE: <strong id="asgdMseValue">0.000</strong></span>
+        <span>Current a: <strong id="asgdCurrentA">0.250</strong></span>
+        <span>Current b: <strong id="asgdCurrentB">0.350</strong></span>
+        <span>Current α: <strong id="asgdAlphaNow">0.0500</strong></span>
+      </div>
+      <div class="viz">
+        <svg id="viz-asgd-alpha" width="360" height="220"></svg>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Learning Curves</h2>
+      <p>The learning curves show how the MSE and parameter values evolve during Annealed Stochastic Gradient Descent training:</p>
+      <div class="curves-grid">
+        <div class="viz">
+          <svg id="viz-curves-asgd-mse" width="360" height="280"></svg>
+        </div>
+        <div class="viz">
+          <svg id="viz-curves-asgd-a" width="360" height="280"></svg>
+        </div>
+        <div class="viz">
+          <svg id="viz-curves-asgd-b" width="360" height="280"></svg>
+        </div>
+      </div>
+    </div>
+
+
+    <div class="section">
+      <h2>Exercise</h2>
+      <ul>
+        <li>Try different annealing factors. Find one that gives good convergence.</li>
+        <li>How much does the result depend on the initial $(a_0,b_0)$?</li>
+        <li>Why is there a lower bound on $\alpha$?</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <div class="callout-box important" style="text-align: center; padding: 24px;">
+        <h2 style="margin-top: 0;">Congratulations!</h2>
+        <p style="font-size: 1.1em; margin-bottom: 0;">that's it!</p>
+        <p style="font-size: 1.1em;">You have just learned <strong>Gradient Descent</strong>, <strong>Stochastic Gradient Descent</strong>, <strong>Batch Gradient Descent</strong> and <strong>Annealed Stochastic Gradient Descent</strong></p>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
