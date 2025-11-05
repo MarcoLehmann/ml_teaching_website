@@ -706,10 +706,9 @@ function initDataViz() {
 // ============================================================================
 function initAnnealedSGDViz() {
   const svg = d3.select('#viz-asgd');
-  const dims = VIZ_DIMENSIONS.standard;
-  const width = dims.width;
-  const height = dims.height;
-  const margin = dims.margin;
+  const width = 600;
+  const height = 400;
+  const margin = { top: 30, right: 80, bottom: 50, left: 60 };
   const w = width - margin.left - margin.right;
   const h = height - margin.top - margin.bottom;
 
@@ -767,8 +766,8 @@ function initAnnealedSGDViz() {
 
   (function initAlphaPlot() {
     const svgAlpha = d3.select('#viz-asgd-alpha');
-    const wA = 360, hA = 520;
-    const marginA = { top: 30, right: 20, bottom: 50, left: 60 };
+    const wA = 340, hA = 400;
+    const marginA = { top: 30, right: 20, bottom: 50, left: 50 };
     svgAlpha.attr('viewBox', `0 0 ${wA} ${hA}`);
     const gA = svgAlpha.append('g').attr('transform', `translate(${marginA.left},${marginA.top})`);
     const w = wA - marginA.left - marginA.right;
@@ -907,10 +906,9 @@ function initAnnealedSGDViz() {
 // ============================================================================
 function initPlateauSGDViz() {
   const svg = d3.select('#viz-plateau');
-  const dims = VIZ_DIMENSIONS.standard;
-  const width = dims.width;
-  const height = dims.height;
-  const margin = dims.margin;
+  const width = 600;
+  const height = 400;
+  const margin = { top: 30, right: 80, bottom: 50, left: 60 };
   const w = width - margin.left - margin.right;
   const h = height - margin.top - margin.bottom;
 
@@ -1019,8 +1017,8 @@ function initPlateauSGDViz() {
   // Alpha plot (shows learning rate over iterations with step reductions)
   (function initAlphaPlot() {
     const svgAlpha = d3.select('#viz-plateau-alpha');
-    const wA = 360, hA = 520;
-    const marginA = { top: 30, right: 20, bottom: 50, left: 60 };
+    const wA = 340, hA = 400;
+    const marginA = { top: 30, right: 20, bottom: 50, left: 50 };
     svgAlpha.attr('viewBox', `0 0 ${wA} ${hA}`);
     const gA = svgAlpha.append('g').attr('transform', `translate(${marginA.left},${marginA.top})`);
     const w = wA - marginA.left - marginA.right;
@@ -1150,6 +1148,7 @@ function initPlateauSGDViz() {
     plateauCurrent.b = parseFloat(document.getElementById('plateauB0').value);
     plateauTrajectory = [{ a: plateauCurrent.a, b: plateauCurrent.b }];
     plateauHistory = [];
+    // Reset plateau detection state when data changes
     bestMSE = Infinity;
     stepsSinceImprovement = 0;
     const alpha0 = parseFloat(document.getElementById('plateauAlpha0').value);
@@ -1642,6 +1641,13 @@ function initBatchLandscapesViz() {
 
   function render() {
     if (currentDataPoints.length === 0) return;
+    
+    // Guard: regenerate batches if any are empty (edge case after data change)
+    if (batch1Indices.length === 0 || batch2Indices.length === 0 || batch3Indices.length === 0) {
+      regenerateBatches();
+      return;
+    }
+    
     const a0 = parseFloat(document.getElementById('batchA0').value);
     const b0 = parseFloat(document.getElementById('batchB0').value);
     const batchSize = parseInt(document.getElementById('batchSizeViz').value, 10);
@@ -2069,7 +2075,17 @@ function createLearningCurvesViz(svgIds, historyGetter, eventName, algorithmName
 
     g.append('g').attr('class', 'axis').attr('transform', `translate(0,${h})`)
       .call(d3.axisBottom(xScale).ticks(5));
-    g.append('g').attr('class', 'axis').call(d3.axisLeft(yScale).ticks(5));
+    
+    // For log scale, use appropriate tick formatting
+    if (isLogScale && yMin > 0) {
+      // For log scales, let D3 choose appropriate ticks and use a custom format
+      g.append('g').attr('class', 'axis')
+        .call(d3.axisLeft(yScale)
+          .ticks(5)
+          .tickFormat(d => d >= 1 ? d3.format('.2f')(d) : d3.format('.3f')(d)));
+    } else {
+      g.append('g').attr('class', 'axis').call(d3.axisLeft(yScale).ticks(5));
+    }
     g.append('text').attr('x', w / 2).attr('y', h + 35).attr('text-anchor', 'middle')
       .attr('fill', '#c9d4e5').attr('font-size', '13px').text('Iteration');
     g.append('text').attr('x', -h / 2).attr('y', -35).attr('text-anchor', 'middle')
@@ -2082,7 +2098,14 @@ function createLearningCurvesViz(svgIds, historyGetter, eventName, algorithmName
       .x((d, i) => xScale(i))
       .y(d => yScale(yAccessor(d)));
 
-    const color = algorithmName === 'GD' ? '#ff00ff' : algorithmName === 'SGD' ? '#00aaff' : '#ffaa00';
+    // Use colors from COLORS constant for consistency
+    const colorMap = {
+      'GD': COLORS.trajectory,
+      'SGD': COLORS.sgd,
+      'ASGD': COLORS.asgd,
+      'Plateau': COLORS.plateau
+    };
+    const color = colorMap[algorithmName] || COLORS.trajectory;
     
     g.append('path')
       .datum(data)
@@ -2295,19 +2318,31 @@ function initComplexLossViz() {
     // Add contour lines
     drawContourLines(g, losses, p1Arr, p2Arr, p1Scale, p2Scale, minLoss, maxLoss, 10);
 
-    // Grid
-    g.append('g').attr('class', 'grid').attr('transform', `translate(0,${h})`)
-      .call(d3.axisBottom(p1Scale).ticks(10).tickSize(-h).tickFormat(''));
-    g.append('g').attr('class', 'grid')
-      .call(d3.axisLeft(p2Scale).ticks(10).tickSize(-w).tickFormat(''));
-
-    // Axes
-    g.append('g').attr('class', 'axis').attr('transform', `translate(0,${h})`)
-      .call(d3.axisBottom(p1Scale).ticks(6));
+    // Grid - show gridlines at 0.5 intervals (but only a subset for clarity)
+    // For p1 (x-axis): -5 to 7, show every integer and half-integer
+    const p1GridTicks = [];
+    for (let i = -5; i <= 7; i += 0.5) {
+      p1GridTicks.push(i);
+    }
     
-    // Set y-ticks as in notebook: range(-6,4,2) -> [-6, -4, -2, 0, 2]
-    const yTicks = [-6, -4, -2, 0, 2];
-    g.append('g').attr('class', 'axis').call(d3.axisLeft(p2Scale).tickValues(yTicks));
+    // For p2 (y-axis): -7 to 2, show every integer and half-integer
+    const p2GridTicks = [];
+    for (let i = -7; i <= 2; i += 0.5) {
+      p2GridTicks.push(i);
+    }
+    
+    g.append('g').attr('class', 'grid').attr('transform', `translate(0,${h})`)
+      .call(d3.axisBottom(p1Scale).tickValues(p1GridTicks).tickSize(-h).tickFormat(''));
+    g.append('g').attr('class', 'grid')
+      .call(d3.axisLeft(p2Scale).tickValues(p2GridTicks).tickSize(-w).tickFormat(''));
+
+    // Axes - show labels only at integer values for clarity
+    const p1AxisTicks = [-4, -2, 0, 2, 4, 6];
+    const p2AxisTicks = [-6, -4, -2, 0, 2];
+    
+    g.append('g').attr('class', 'axis').attr('transform', `translate(0,${h})`)
+      .call(d3.axisBottom(p1Scale).tickValues(p1AxisTicks));
+    g.append('g').attr('class', 'axis').call(d3.axisLeft(p2Scale).tickValues(p2AxisTicks));
 
     g.append('text').attr('x', w / 2).attr('y', h + 40).attr('text-anchor', 'middle')
       .attr('fill', '#c9d4e5').text('p1');

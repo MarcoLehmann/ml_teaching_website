@@ -7,8 +7,8 @@
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
-  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <script>window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']] } };</script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <script defer src="main.js"></script>
   <meta name="description" content="Interactive SGD tutorial: Data, Model, Loss, and Optimizer.">
 </head>
@@ -405,6 +405,7 @@
         <ul>
           <li><strong>Gradient Descent stops at a local minimum.</strong> There's no guarantee to find a/the <strong>global minimum</strong>.</li>
           <li>A possible solution is to run the algorithm multiple times from different initial values.</li>
+          <li>The function has a saddle point. There, the gradient is very small and it can take many iterations to move away from that region.</li>
       </ul>
         </details>
 
@@ -635,10 +636,10 @@
       </div>
       <div class="viz-grid">
         <div class="viz">
-          <svg id="viz-asgd" width="760" height="520"></svg>
+          <svg id="viz-asgd" width="600" height="400"></svg>
         </div>
         <div class="viz">
-          <svg id="viz-asgd-alpha" width="360" height="520"></svg>
+          <svg id="viz-asgd-alpha" width="340" height="400"></svg>
         </div>
       </div>
       <div class="metrics">
@@ -685,7 +686,8 @@
       <h2>Stochastic Gradient Descent with Reduce on Plateau</h2>
       <p>
         Another approach to adapting the learning rate is to reduce it only when necessary, rather than at every step. 
-        The <strong>Reduce on Plateau</strong> (ReduceLROnPlateau) scheduler monitors the loss function (MSE in our case) and reduces the learning rate when the loss stops improving.
+        The <strong>Reduce on Plateau</strong> scheduler monitors the MSE and reduces the learning rate when the loss stops improving.
+        (Other variants monitor a metric of the validation set. We do not further discuss them here.)
         <br>
         This is more adaptive than annealing because:
       </p>
@@ -704,8 +706,8 @@
           <input id="plateauAlpha0" type="range" min="0.001" max="0.2" step="0.001" value="0.10" aria-label="Initial learning rate for Plateau SGD">
         </label>
         <label class="control">
-          <span>Reduction factor: <strong id="plateauFactorValue">0.50</strong></span>
-          <input id="plateauFactor" type="range" min="0.1" max="0.9" step="0.05" value="0.5" aria-label="Learning rate reduction factor">
+          <span>Reduction factor: <strong id="plateauFactorValue">0.80</strong></span>
+          <input id="plateauFactor" type="range" min="0.0" max="1.0" step="0.02" value="0.8" aria-label="Learning rate reduction factor">
         </label>
         <label class="control">
           <span>Lower bound: <strong id="plateauLowerValue">0.0010</strong></span>
@@ -739,10 +741,10 @@
       </div>
       <div class="viz-grid">
         <div class="viz">
-          <svg id="viz-plateau" width="760" height="520"></svg>
+          <svg id="viz-plateau" width="600" height="400"></svg>
         </div>
         <div class="viz">
-          <svg id="viz-plateau-alpha" width="360" height="520"></svg>
+          <svg id="viz-plateau-alpha" width="340" height="400"></svg>
         </div>
       </div>
       <div class="metrics">
@@ -780,7 +782,7 @@
       <h2>Exercise</h2>
       <ul>
         <li>Compare the convergence behavior with Annealed SGD. Which converges faster? Which is more stable?</li>
-        <li>Try different patience values (5, 20, 50). How does patience affect the algorithm's behavior?</li>
+        <li>Try different patience values (1, 5, 50). How does patience affect the algorithm's behavior?</li>
         <li>Experiment with different reduction factors (0.5 vs 0.9). What is the trade-off?</li>
         <li>Why is Reduce on Plateau considered more adaptive than annealing?</li>
         <li>What happens if the patience is too small? Too large?</li>
