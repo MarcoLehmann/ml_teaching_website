@@ -37,12 +37,14 @@ svg { display: block; width: 100%; height: auto; }
 .curves-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
 .step-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
 .batch-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+.viz-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; align-items: start; }
 .step-grid .viz, .batch-grid .viz, .curves-grid .viz { max-width: 100%; margin-left: 0; margin-right: 0; }
+.viz-grid .viz { max-width: 100%; margin-left: 0; margin-right: 0; }
 .section > .viz { max-width: 50%; margin-left: auto; margin-right: auto; }
 
 /* D3 elements */
 .axis path, .axis line { stroke: #2a3a63; }
-.axis text { fill: #c9d4e5; font-size: 14px; }
+.axis text { fill: #c9d4e5; font-size: 12px; }
 .grid line { stroke: #1d2b4d; stroke-opacity: 0.6; stroke-width: 0.5px; shape-rendering: crispEdges; }
 .grid .domain { stroke: none; }
 .zero-line { stroke: #5a6a93; stroke-width: 1.5px; opacity: 0.8; }

@@ -376,15 +376,81 @@ function renderDataPlot(config) {
   // Title
   if (title) {
     g.append('text').attr('x', w / 2).attr('y', -10).attr('text-anchor', 'middle')
-      .attr('fill', '#ffffff').attr('font-size', '12px').text(title);
+      .attr('fill', '#ffffff').attr('font-size', '15px').text(title);
   }
 
   // MSE
   if (showMSE && modelA !== null && modelB !== null) {
     const mse = computeMSE(dataPoints, modelA, modelB);
-    g.append('text').attr('x', 10).attr('y', 20).attr('fill', '#ffffff').attr('font-size', '14px')
+    g.append('text').attr('x', 10).attr('y', 20).attr('fill', '#ffffff').attr('font-size', '15px')
       .attr('font-weight', 'bold')
       .text(`MSE: ${mse.toFixed(4)}`);
+  }
+
+  // Legend (lower right quadrant)
+  if (showTruthLine || showModelLine || dataPoints.length > 0) {
+    const legendX = w * 0.65; // Position in lower right quadrant
+    const legendY = h * 0.75;
+    const lineLength = 30;
+    const lineSpacing = 22;
+    let legendYOffset = 0;
+
+    const legend = g.append('g').attr('class', 'legend');
+
+    // Ground truth line (if shown)
+    if (showTruthLine) {
+      legend.append('line')
+        .attr('x1', legendX)
+        .attr('x2', legendX + lineLength)
+        .attr('y1', legendY + legendYOffset)
+        .attr('y2', legendY + legendYOffset)
+        .attr('stroke', COLORS.truthLine)
+        .attr('stroke-width', 2.5)
+        .attr('stroke-dasharray', '6,4')
+        .attr('opacity', 0.9);
+      legend.append('text')
+        .attr('x', legendX + lineLength + 8)
+        .attr('y', legendY + legendYOffset + 5)
+        .attr('fill', '#c9d4e5')
+        .attr('font-size', '13px')
+        .text('Ground truth');
+      legendYOffset += lineSpacing;
+    }
+
+    // Model line (if shown)
+    if (showModelLine) {
+      legend.append('line')
+        .attr('x1', legendX)
+        .attr('x2', legendX + lineLength)
+        .attr('y1', legendY + legendYOffset)
+        .attr('y2', legendY + legendYOffset)
+        .attr('stroke', COLORS.modelLine)
+        .attr('stroke-width', 3)
+        .attr('opacity', 0.8);
+      legend.append('text')
+        .attr('x', legendX + lineLength + 8)
+        .attr('y', legendY + legendYOffset + 5)
+        .attr('fill', '#c9d4e5')
+        .attr('font-size', '13px')
+        .text('Model');
+      legendYOffset += lineSpacing;
+    }
+
+    // Data points
+    if (dataPoints.length > 0) {
+      legend.append('circle')
+        .attr('cx', legendX + lineLength / 2)
+        .attr('cy', legendY + legendYOffset)
+        .attr('r', 6)
+        .attr('fill', COLORS.point)
+        .attr('opacity', 0.8);
+      legend.append('text')
+        .attr('x', legendX + lineLength + 8)
+        .attr('y', legendY + legendYOffset + 5)
+        .attr('fill', '#c9d4e5')
+        .attr('font-size', '13px')
+        .text('Data');
+    }
   }
 
   return { xScale, yScale, g };
@@ -701,8 +767,8 @@ function initAnnealedSGDViz() {
 
   (function initAlphaPlot() {
     const svgAlpha = d3.select('#viz-asgd-alpha');
-    const wA = 360, hA = 220;
-    const marginA = { top: 24, right: 20, bottom: 36, left: 48 };
+    const wA = 360, hA = 520;
+    const marginA = { top: 30, right: 20, bottom: 50, left: 60 };
     svgAlpha.attr('viewBox', `0 0 ${wA} ${hA}`);
     const gA = svgAlpha.append('g').attr('transform', `translate(${marginA.left},${marginA.top})`);
     const w = wA - marginA.left - marginA.right;
@@ -712,7 +778,7 @@ function initAnnealedSGDViz() {
       gA.selectAll('*').remove();
       if (asgdHistory.length === 0) {
         gA.append('text').attr('x', w / 2).attr('y', h / 2)
-          .attr('text-anchor', 'middle').attr('fill', '#c9d4e5').attr('font-size', '12px')
+          .attr('text-anchor', 'middle').attr('fill', '#c9d4e5').attr('font-size', '13px')
           .text('Run ASGD to see α decay');
         return;
       }
@@ -728,13 +794,13 @@ function initAnnealedSGDViz() {
         .call(d3.axisBottom(x).ticks(5));
       gA.append('g').attr('class', 'axis').call(d3.axisLeft(y).ticks(5));
       gA.append('text').attr('x', w / 2).attr('y', -8).attr('text-anchor', 'middle')
-        .attr('fill', '#ffffff').attr('font-size', '12px').text('Learning Rate (α) over Iterations');
-      gA.append('text').attr('x', w / 2).attr('y', h + 28).attr('text-anchor', 'middle')
-        .attr('fill', '#c9d4e5').attr('font-size', '11px').text('Iteration');
-      gA.append('text').attr('x', w / 2).attr('y', h + 28).attr('text-anchor', 'middle');
-      gA.append('text').attr('x', -h / 2).attr('y', -36).attr('text-anchor', 'middle')
-        .attr('fill', '#c9d4e5').attr('font-size', '11px')
-        .attr('transform', `rotate(-90, -${h / 2}, -36)`).text('α');
+        .attr('fill', '#ffffff').attr('font-size', '15px').text('Learning Rate (α) over Iterations');
+      gA.append('text').attr('x', w / 2).attr('y', h + 40).attr('text-anchor', 'middle')
+        .attr('fill', '#c9d4e5').attr('font-size', '13px').text('Iteration');
+      gA.append('text').attr('x', w / 2).attr('y', h + 40).attr('text-anchor', 'middle');
+      gA.append('text').attr('x', -h / 2).attr('y', -40).attr('text-anchor', 'middle')
+        .attr('fill', '#c9d4e5').attr('font-size', '13px')
+        .attr('transform', `rotate(-90, -${h / 2}, -40)`).text('α');
 
       const line = d3.line().x((d, i) => x(i)).y(d => y(d.alpha));
       gA.append('path').datum(asgdHistory)
@@ -953,8 +1019,8 @@ function initPlateauSGDViz() {
   // Alpha plot (shows learning rate over iterations with step reductions)
   (function initAlphaPlot() {
     const svgAlpha = d3.select('#viz-plateau-alpha');
-    const wA = 360, hA = 220;
-    const marginA = { top: 24, right: 20, bottom: 36, left: 48 };
+    const wA = 360, hA = 520;
+    const marginA = { top: 30, right: 20, bottom: 50, left: 60 };
     svgAlpha.attr('viewBox', `0 0 ${wA} ${hA}`);
     const gA = svgAlpha.append('g').attr('transform', `translate(${marginA.left},${marginA.top})`);
     const w = wA - marginA.left - marginA.right;
@@ -964,7 +1030,7 @@ function initPlateauSGDViz() {
       gA.selectAll('*').remove();
       if (plateauHistory.length === 0) {
         gA.append('text').attr('x', w / 2).attr('y', h / 2)
-          .attr('text-anchor', 'middle').attr('fill', '#c9d4e5').attr('font-size', '12px')
+          .attr('text-anchor', 'middle').attr('fill', '#c9d4e5').attr('font-size', '13px')
           .text('Run Plateau SGD to see α changes');
         return;
       }
@@ -980,12 +1046,12 @@ function initPlateauSGDViz() {
         .call(d3.axisBottom(x).ticks(5));
       gA.append('g').attr('class', 'axis').call(d3.axisLeft(y).ticks(5));
       gA.append('text').attr('x', w / 2).attr('y', -8).attr('text-anchor', 'middle')
-        .attr('fill', '#ffffff').attr('font-size', '12px').text('Learning Rate (α) over Iterations');
-      gA.append('text').attr('x', w / 2).attr('y', h + 28).attr('text-anchor', 'middle')
-        .attr('fill', '#c9d4e5').attr('font-size', '11px').text('Iteration');
-      gA.append('text').attr('x', -h / 2).attr('y', -36).attr('text-anchor', 'middle')
-        .attr('fill', '#c9d4e5').attr('font-size', '11px')
-        .attr('transform', `rotate(-90, -${h / 2}, -36)`).text('α');
+        .attr('fill', '#ffffff').attr('font-size', '15px').text('Learning Rate (α) over Iterations');
+      gA.append('text').attr('x', w / 2).attr('y', h + 40).attr('text-anchor', 'middle')
+        .attr('fill', '#c9d4e5').attr('font-size', '13px').text('Iteration');
+      gA.append('text').attr('x', -h / 2).attr('y', -40).attr('text-anchor', 'middle')
+        .attr('fill', '#c9d4e5').attr('font-size', '13px')
+        .attr('transform', `rotate(-90, -${h / 2}, -40)`).text('α');
 
       const line = d3.line().x((d, i) => x(i)).y(d => y(d.alpha));
       gA.append('path').datum(plateauHistory)
@@ -1262,7 +1328,7 @@ function initLandscapeViz() {
 
     // Title
     g.append('text').attr('x', w / 2).attr('y', -10).attr('text-anchor', 'middle')
-      .attr('fill', '#ffffff').attr('font-size', '14px').text('Error Landscape: MSE as a function of a and b');
+      .attr('fill', '#ffffff').attr('font-size', '15px').text('Error Landscape: MSE as a function of a and b');
 
     // Colorbar
     const colorbarW = 20, colorbarH = h;
@@ -1294,7 +1360,7 @@ function initLandscapeViz() {
     axisG.call(d3.axisRight(colorScale2).tickValues(tickVals).tickFormat(d3.format('.2f')))
       .selectAll('text')
       .attr('fill', '#ffffff')
-      .attr('font-size', '12px')
+      .attr('font-size', '13px')
       .attr('font-weight', '500');
     axisG.selectAll('line').attr('stroke', '#ffffff').attr('opacity', 0.6);
     axisG.selectAll('path').attr('stroke', '#ffffff').attr('opacity', 0.6);
@@ -1392,7 +1458,7 @@ function initSingleStepViz() {
       .attr('fill', '#00ff00').attr('stroke', '#fff').attr('stroke-width', 2);
 
     g.append('text').attr('x', w / 2).attr('y', -10).attr('text-anchor', 'middle')
-      .attr('fill', '#ffffff').attr('font-size', '12px').text('Gradient Step on Landscape');
+      .attr('fill', '#ffffff').attr('font-size', '15px').text('Gradient Step on Landscape');
     
     // Return computed values for consistency
     return { a1: finalA1, b1: finalB1 };
@@ -1566,7 +1632,7 @@ function initBatchLandscapesViz() {
     // Title with batch indices
     const idxText = batchIndices.join(', ');
     g.append('text').attr('x', w / 2).attr('y', -10).attr('text-anchor', 'middle')
-      .attr('fill', '#ffffff').attr('font-size', '12px')
+      .attr('fill', '#ffffff').attr('font-size', '15px')
       .text(`Batch ${batchNum}: J=[${idxText}]`);
   }
 
@@ -1932,11 +1998,22 @@ let plateauRunning = false;
 let plateauHistory = [];
 
 // Reusable function to create learning curves visualization
-function createLearningCurvesViz(svgIds, historyGetter, eventName, algorithmName) {
+function createLearningCurvesViz(svgIds, historyGetter, eventName, algorithmName, logScaleCheckboxId) {
   const width = 360, height = 280;
   const margin = { top: 30, right: 20, bottom: 40, left: 50 };
   const w = width - margin.left - margin.right;
   const h = height - margin.top - margin.bottom;
+  
+  let useLogScale = false;
+  if (logScaleCheckboxId) {
+    const checkbox = document.getElementById(logScaleCheckboxId);
+    if (checkbox) {
+      checkbox.addEventListener('change', () => {
+        useLogScale = checkbox.checked;
+        renderCurves();
+      });
+    }
+  }
 
   const svgMSE = d3.select(svgIds.mse);
   const svgA = d3.select(svgIds.a);
@@ -1950,12 +2027,12 @@ function createLearningCurvesViz(svgIds, historyGetter, eventName, algorithmName
   const gA = svgA.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
   const gB = svgB.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-  function renderPlot(g, data, yAccessor, yLabel, title, yBounds = null) {
+  function renderPlot(g, data, yAccessor, yLabel, title, yBounds = null, isLogScale = false) {
     g.selectAll('*').remove();
 
     if (!data || data.length === 0) {
       g.append('text').attr('x', w / 2).attr('y', h / 2)
-        .attr('text-anchor', 'middle').attr('fill', '#c9d4e5').attr('font-size', '12px')
+        .attr('text-anchor', 'middle').attr('fill', '#c9d4e5').attr('font-size', '13px')
         .text(`Run ${algorithmName} to see curves`);
       return;
     }
@@ -1973,7 +2050,17 @@ function createLearningCurvesViz(svgIds, historyGetter, eventName, algorithmName
       yMin = d3.min(allVals) || 0;
       yMax = d3.max(allVals) || 1;
     }
-    const yScale = d3.scaleLinear().domain([yMin, yMax]).range([h, 0]);
+    
+    // Use log scale if requested and appropriate
+    let yScale;
+    if (isLogScale && yMin > 0) {
+      // Ensure log scale has positive domain
+      const logMin = yMin > 0 ? yMin : 0.0001;
+      const logMax = yMax > logMin ? yMax : logMin * 10;
+      yScale = d3.scaleLog().domain([logMin, logMax]).range([h, 0]);
+    } else {
+      yScale = d3.scaleLinear().domain([yMin, yMax]).range([h, 0]);
+    }
 
     g.append('g').attr('class', 'grid').attr('transform', `translate(0,${h})`)
       .call(d3.axisBottom(xScale).ticks(5).tickSize(-h).tickFormat(''));
@@ -1984,12 +2071,12 @@ function createLearningCurvesViz(svgIds, historyGetter, eventName, algorithmName
       .call(d3.axisBottom(xScale).ticks(5));
     g.append('g').attr('class', 'axis').call(d3.axisLeft(yScale).ticks(5));
     g.append('text').attr('x', w / 2).attr('y', h + 35).attr('text-anchor', 'middle')
-      .attr('fill', '#c9d4e5').attr('font-size', '11px').text('Iteration');
+      .attr('fill', '#c9d4e5').attr('font-size', '13px').text('Iteration');
     g.append('text').attr('x', -h / 2).attr('y', -35).attr('text-anchor', 'middle')
-      .attr('fill', '#c9d4e5').attr('font-size', '11px')
+      .attr('fill', '#c9d4e5').attr('font-size', '13px')
       .attr('transform', `rotate(-90, -${h / 2}, -35)`).text(yLabel);
     g.append('text').attr('x', w / 2).attr('y', -10).attr('text-anchor', 'middle')
-      .attr('fill', '#ffffff').attr('font-size', '13px').text(title);
+      .attr('fill', '#ffffff').attr('font-size', '15px').text(title);
 
     const lineGen = d3.line()
       .x((d, i) => xScale(i))
@@ -2007,22 +2094,23 @@ function createLearningCurvesViz(svgIds, historyGetter, eventName, algorithmName
     // Legend
     g.append('line').attr('x1', 10).attr('x2', 35).attr('y1', 5).attr('y2', 5)
       .attr('stroke', color).attr('stroke-width', 2);
-    g.append('text').attr('x', 40).attr('y', 9).attr('fill', '#c9d4e5').attr('font-size', '10px')
+    g.append('text').attr('x', 40).attr('y', 9).attr('fill', '#c9d4e5').attr('font-size', '12px')
       .text(algorithmName);
   }
 
   function renderCurves() {
     const historyData = historyGetter();
     
-    // MSE: fixed min at 0, max from data
+    // MSE: fixed min at 0, max from data, with optional log scale
     const mseMax = historyData.length > 0 ? d3.max(historyData, d => d.mse) || 1 : 1;
-    renderPlot(gMSE, historyData, d => d.mse, 'MSE', 'Mean Squared Error', { min: 0, max: mseMax });
+    const mseMin = useLogScale ? (d3.min(historyData, d => d.mse) || 0.0001) : 0;
+    renderPlot(gMSE, historyData, d => d.mse, 'MSE', 'Mean Squared Error', { min: mseMin, max: mseMax }, useLogScale);
     
     // Parameter a: fixed bounds from PARAM_RANGES
-    renderPlot(gA, historyData, d => d.a, 'a', 'Parameter a (slope)', { min: PARAM_RANGES.aMin, max: PARAM_RANGES.aMax });
+    renderPlot(gA, historyData, d => d.a, 'a', 'Parameter a (slope)', { min: PARAM_RANGES.aMin, max: PARAM_RANGES.aMax }, false);
     
     // Parameter b: fixed bounds from PARAM_RANGES
-    renderPlot(gB, historyData, d => d.b, 'b', 'Parameter b (intercept)', { min: PARAM_RANGES.bMin, max: PARAM_RANGES.bMax });
+    renderPlot(gB, historyData, d => d.b, 'b', 'Parameter b (intercept)', { min: PARAM_RANGES.bMin, max: PARAM_RANGES.bMax }, false);
   }
 
   window.addEventListener(eventName, renderCurves);
@@ -2034,7 +2122,8 @@ function initGDCurvesViz() {
     { mse: '#viz-curves-gd-mse', a: '#viz-curves-gd-a', b: '#viz-curves-gd-b' },
     () => gdHistory,
     'gdUpdated',
-    'GD'
+    'GD',
+    'gdMseLogScale'
   );
 }
 
@@ -2043,7 +2132,8 @@ function initSGDCurvesViz() {
     { mse: '#viz-curves-sgd-mse', a: '#viz-curves-sgd-a', b: '#viz-curves-sgd-b' },
     () => sgdHistory,
     'sgdUpdated',
-    'SGD'
+    'SGD',
+    'sgdMseLogScale'
   );
 }
 
@@ -2052,7 +2142,8 @@ function initASGDCurvesViz() {
     { mse: '#viz-curves-asgd-mse', a: '#viz-curves-asgd-a', b: '#viz-curves-asgd-b' },
     () => asgdHistory,
     'asgdUpdated',
-    'ASGD'
+    'ASGD',
+    'asgdMseLogScale'
   );
 }
 
@@ -2061,7 +2152,8 @@ function initPlateauCurvesViz() {
     { mse: '#viz-curves-plateau-mse', a: '#viz-curves-plateau-a', b: '#viz-curves-plateau-b' },
     () => plateauHistory,
     'plateauUpdated',
-    'Plateau'
+    'Plateau',
+    'plateauMseLogScale'
   );
 }
 
@@ -2224,7 +2316,7 @@ function initComplexLossViz() {
 
     // Title
     g.append('text').attr('x', w / 2).attr('y', -10).attr('text-anchor', 'middle')
-      .attr('fill', '#ffffff').attr('font-size', '14px').text('Loss Landscape');
+      .attr('fill', '#ffffff').attr('font-size', '15px').text('Loss Landscape');
 
     // Colorbar
     const colorbarW = 20, colorbarH = h;

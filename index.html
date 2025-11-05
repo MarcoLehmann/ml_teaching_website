@@ -359,6 +359,12 @@
     <div class="section">
       <h2>Learning Curves</h2>
       <p>The learning curve shows how the MSE decreases. Additionally the evolution of the model parameters a and b during training is shown:</p>
+      <div style="margin-bottom: 12px;">
+        <label style="color: #c9d4e5; font-size: 14px; cursor: pointer;">
+          <input type="checkbox" id="gdMseLogScale" style="margin-right: 6px;">
+          Use log scale for MSE plot
+        </label>
+      </div>
       <div class="curves-grid">
         <div class="viz">
           <svg id="viz-curves-gd-mse" width="360" height="280"></svg>
@@ -372,17 +378,18 @@
       </div>
     </div>
 
-    <div class="section">
+    <div class="section exercise">
       <h2>Exercise</h2>
       <ul>
         <li>Try different learning rates (e.g., 0.001, 0.1, 0.2).</li>
         <li>Try different numbers of iterations and initial values $(a_0,b_0)$.</li>
         <li>Discuss possible stopping criteria.</li>
+        <li>The parameters a and b do not converge to their final values at the same speed. Explain why.</li>
       </ul>
     </div>
 
     <div class="section exercise">
-      <h3>Exercise</h3>
+      <h3>A more complex loss landscape</h3>
       <p>Look at the loss function plotted below. It is a constructed example. Imagine the figure showed the error-landscape of a two-parameter-model fitted to some data.</p>
       <ul>
         <li>What problem do you identify, when applying Gradient Descent?</li>
@@ -494,6 +501,12 @@
 
     <div class="section">
       <h2>Learning Curve for SGD</h2>
+      <div style="margin-bottom: 12px;">
+        <label style="color: #c9d4e5; font-size: 14px; cursor: pointer;">
+          <input type="checkbox" id="sgdMseLogScale" style="margin-right: 6px;">
+          Use log scale for MSE plot
+        </label>
+      </div>
       <div class="curves-grid">
         <div class="viz">
           <svg id="viz-curves-sgd-mse" width="360" height="280"></svg>
@@ -620,8 +633,13 @@
           <button id="asgdResetBtn" type="button" aria-label="Reset annealed stochastic gradient descent">Reset</button>
         </div>
       </div>
-      <div class="viz">
-        <svg id="viz-asgd" width="760" height="520"></svg>
+      <div class="viz-grid">
+        <div class="viz">
+          <svg id="viz-asgd" width="760" height="520"></svg>
+        </div>
+        <div class="viz">
+          <svg id="viz-asgd-alpha" width="360" height="520"></svg>
+        </div>
       </div>
       <div class="metrics">
         <span>Current MSE: <strong id="asgdMseValue">0.000</strong></span>
@@ -629,14 +647,17 @@
         <span>Current b: <strong id="asgdCurrentB">0.350</strong></span>
         <span>Current α: <strong id="asgdAlphaNow">0.0500</strong></span>
       </div>
-      <div class="viz">
-        <svg id="viz-asgd-alpha" width="360" height="220"></svg>
-      </div>
     </div>
 
     <div class="section">
       <h2>Learning Curves</h2>
       <p>The learning curves show how the MSE and parameter values evolve during Annealed Stochastic Gradient Descent training:</p>
+      <div style="margin-bottom: 12px;">
+        <label style="color: #c9d4e5; font-size: 14px; cursor: pointer;">
+          <input type="checkbox" id="asgdMseLogScale" style="margin-right: 6px;">
+          Use log scale for MSE plot
+        </label>
+      </div>
       <div class="curves-grid">
         <div class="viz">
           <svg id="viz-curves-asgd-mse" width="360" height="280"></svg>
@@ -716,8 +737,13 @@
           <button id="plateauResetBtn" type="button" aria-label="Reset plateau SGD">Reset</button>
         </div>
       </div>
-      <div class="viz">
-        <svg id="viz-plateau" width="760" height="520"></svg>
+      <div class="viz-grid">
+        <div class="viz">
+          <svg id="viz-plateau" width="760" height="520"></svg>
+        </div>
+        <div class="viz">
+          <svg id="viz-plateau-alpha" width="360" height="520"></svg>
+        </div>
       </div>
       <div class="metrics">
         <span>Current MSE: <strong id="plateauMseValue">0.000</strong></span>
@@ -726,14 +752,17 @@
         <span>Current α: <strong id="plateauAlphaNow">0.0500</strong></span>
         <span>Steps since improvement: <strong id="plateauStepsValue">0</strong></span>
       </div>
-      <div class="viz">
-        <svg id="viz-plateau-alpha" width="360" height="220"></svg>
-      </div>
     </div>
 
     <div class="section">
       <h2>Learning Curves</h2>
       <p>The learning curves show how the MSE and parameter values evolve during Plateau SGD training:</p>
+      <div style="margin-bottom: 12px;">
+        <label style="color: #c9d4e5; font-size: 14px; cursor: pointer;">
+          <input type="checkbox" id="plateauMseLogScale" style="margin-right: 6px;">
+          Use log scale for MSE plot
+        </label>
+      </div>
       <div class="curves-grid">
         <div class="viz">
           <svg id="viz-curves-plateau-mse" width="360" height="280"></svg>
