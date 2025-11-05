@@ -8,6 +8,7 @@
  * - Gradient Descent (GD)
  * - Stochastic Gradient Descent (SGD)
  * - Annealed Stochastic Gradient Descent (ASGD)
+ * - Reduce on Plateau (ReduceLROnPlateau)
  * 
  * The tutorial uses a simple linear regression problem (y = ax + b) to
  * demonstrate how these optimization algorithms work, visualizing:
@@ -15,6 +16,7 @@
  * - Optimization trajectories
  * - Learning curves
  * - The effect of batch size and learning rate
+ * - Adaptive learning rate scheduling
  * 
  * Architecture:
  * 1. Global utilities (MSE, gradient computation, landscape rendering)
@@ -24,10 +26,11 @@
  * 5. Gradient Descent implementation and visualization
  * 6. Stochastic Gradient Descent with mini-batches
  * 7. Annealed SGD with learning rate decay
- * 8. Learning curves for all algorithms
+ * 8. Reduce on Plateau with adaptive learning rate
+ * 9. Learning curves for all algorithms
  * 
  * @author Marco Lehmann
- * @version 2.0 - Refactored for maintainability
+ * @version 2.1 - Added Reduce on Plateau scheduler
  */
 
 // ============================================================================
@@ -46,10 +49,10 @@ const yDomain = [-4, 4];
 
 // Parameter ranges (used across multiple visualizations)
 const PARAM_RANGES = {
-  aMin: 0.1,
-  aMax: 0.7,
+  aMin: 0.0,
+  aMax: 0.8,
   bMin: 0.0,
-  bMax: 0.6
+  bMax: 0.8
 };
 
 // Visualization dimensions and margins
@@ -79,6 +82,7 @@ const COLORS = {
   gradient: '#ffff00',
   sgd: '#00aaff',
   asgd: '#ffaa00',
+  plateau: '#00ff88',
   modelLine: '#3a89ff',
   truthLine: '#2ecc71',
   residual: '#ff4d4d',
@@ -829,6 +833,285 @@ function initAnnealedSGDViz() {
   const alpha0 = parseFloat(document.getElementById('asgdAlpha0').value);
   asgdHistory = [{ mse: computeMSE(currentDataPoints, asgdCurrent.a, asgdCurrent.b), a: asgdCurrent.a, b: asgdCurrent.b, alpha: alpha0 }];
   document.getElementById('asgdAlphaNow').textContent = alpha0.toFixed(4);
+  render(); // Initial render after deferred init
+}
+
+// ============================================================================
+// Reduce on Plateau Visualization
+// ============================================================================
+function initPlateauSGDViz() {
+  const svg = d3.select('#viz-plateau');
+  const dims = VIZ_DIMENSIONS.standard;
+  const width = dims.width;
+  const height = dims.height;
+  const margin = dims.margin;
+  const w = width - margin.left - margin.right;
+  const h = height - margin.top - margin.bottom;
+
+  svg.attr('viewBox', `0 0 ${width} ${height}`);
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const { aMin, aMax, bMin, bMax } = PARAM_RANGES;
+
+  // Helper to generate random starting position within valid ranges
+  function randomStartPosition() {
+    return {
+      a: aMin + Math.random() * (aMax - aMin),
+      b: bMin + Math.random() * (bMax - bMin)
+    };
+  }
+
+  // Plateau detection state
+  let bestMSE = Infinity;
+  let stepsSinceImprovement = 0;
+
+  function render() {
+    if (currentDataPoints.length === 0) return;
+    g.selectAll('*').remove();
+
+    // Render landscape and get scale info
+    const landscapeData = renderErrorLandscape(g, w, h, currentDataPoints, aMin, aMax, bMin, bMax, 25);
+    
+    // Draw trajectory using plateau color
+    if (plateauTrajectory.length > 0) {
+      const line = d3.line()
+        .x(d => landscapeData.xOffset + landscapeData.aScale(d.a))
+        .y(d => landscapeData.yOffset + landscapeData.bScale(d.b));
+      
+      g.append('path')
+        .datum(plateauTrajectory)
+        .attr('d', line)
+        .attr('stroke', COLORS.plateau)
+        .attr('stroke-width', 2)
+        .attr('fill', 'none')
+        .attr('opacity', 0.7);
+      
+      // Draw current point
+      const cx = landscapeData.xOffset + landscapeData.aScale(plateauCurrent.a);
+      const cy = landscapeData.yOffset + landscapeData.bScale(plateauCurrent.b);
+      g.append('circle')
+        .attr('cx', cx)
+        .attr('cy', cy)
+        .attr('r', 6)
+        .attr('fill', COLORS.plateau)
+        .attr('stroke', COLORS.trajectoryPoint)
+        .attr('stroke-width', 2);
+    }
+  }
+
+  function step() {
+    const batchSize = parseInt(document.getElementById('plateauBatch').value, 10);
+    const { da, db } = computeGradientBatch(currentDataPoints, plateauCurrent.a, plateauCurrent.b, batchSize);
+
+    const alpha = plateauHistory.length === 0
+      ? parseFloat(document.getElementById('plateauAlpha0').value)
+      : plateauHistory[plateauHistory.length - 1].alpha;
+
+    plateauCurrent.a -= alpha * da;
+    plateauCurrent.b -= alpha * db;
+    plateauTrajectory.push({ a: plateauCurrent.a, b: plateauCurrent.b });
+
+    const mse = computeMSE(currentDataPoints, plateauCurrent.a, plateauCurrent.b);
+
+    // Plateau detection logic
+    let nextAlpha = alpha;
+    const patience = parseInt(document.getElementById('plateauPatience').value, 10);
+    const factor = parseFloat(document.getElementById('plateauFactor').value);
+    const lower = parseFloat(document.getElementById('plateauLower').value);
+
+    if (mse < bestMSE) {
+      // Improvement detected
+      bestMSE = mse;
+      stepsSinceImprovement = 0;
+    } else {
+      // No improvement
+      stepsSinceImprovement++;
+      if (stepsSinceImprovement >= patience) {
+        // Plateau detected - reduce learning rate
+        nextAlpha = Math.max(alpha * factor, lower);
+        stepsSinceImprovement = 0; // Reset counter after reduction
+      }
+    }
+
+    plateauHistory.push({ 
+      mse, 
+      a: plateauCurrent.a, 
+      b: plateauCurrent.b, 
+      alpha: nextAlpha, 
+      stepsSinceImprovement 
+    });
+    window.dispatchEvent(new Event('plateauUpdated'));
+
+    document.getElementById('plateauMseValue').textContent = mse.toFixed(4);
+    document.getElementById('plateauCurrentA').textContent = plateauCurrent.a.toFixed(3);
+    document.getElementById('plateauCurrentB').textContent = plateauCurrent.b.toFixed(3);
+    document.getElementById('plateauAlphaNow').textContent = nextAlpha.toFixed(4);
+    document.getElementById('plateauStepsValue').textContent = String(stepsSinceImprovement);
+    render();
+  }
+
+  // Alpha plot (shows learning rate over iterations with step reductions)
+  (function initAlphaPlot() {
+    const svgAlpha = d3.select('#viz-plateau-alpha');
+    const wA = 360, hA = 220;
+    const marginA = { top: 24, right: 20, bottom: 36, left: 48 };
+    svgAlpha.attr('viewBox', `0 0 ${wA} ${hA}`);
+    const gA = svgAlpha.append('g').attr('transform', `translate(${marginA.left},${marginA.top})`);
+    const w = wA - marginA.left - marginA.right;
+    const h = hA - marginA.top - marginA.bottom;
+
+    function renderAlpha() {
+      gA.selectAll('*').remove();
+      if (plateauHistory.length === 0) {
+        gA.append('text').attr('x', w / 2).attr('y', h / 2)
+          .attr('text-anchor', 'middle').attr('fill', '#c9d4e5').attr('font-size', '12px')
+          .text('Run Plateau SGD to see α changes');
+        return;
+      }
+      const x = d3.scaleLinear().domain([0, plateauHistory.length]).range([0, w]);
+      const y = d3.scaleLinear().domain([0, d3.max(plateauHistory, d => d.alpha) || 1]).range([h, 0]);
+
+      gA.append('g').attr('class', 'grid').attr('transform', `translate(0,${h})`)
+        .call(d3.axisBottom(x).ticks(5).tickSize(-h).tickFormat(''));
+      gA.append('g').attr('class', 'grid')
+        .call(d3.axisLeft(y).ticks(5).tickSize(-w).tickFormat(''));
+
+      gA.append('g').attr('class', 'axis').attr('transform', `translate(0,${h})`)
+        .call(d3.axisBottom(x).ticks(5));
+      gA.append('g').attr('class', 'axis').call(d3.axisLeft(y).ticks(5));
+      gA.append('text').attr('x', w / 2).attr('y', -8).attr('text-anchor', 'middle')
+        .attr('fill', '#ffffff').attr('font-size', '12px').text('Learning Rate (α) over Iterations');
+      gA.append('text').attr('x', w / 2).attr('y', h + 28).attr('text-anchor', 'middle')
+        .attr('fill', '#c9d4e5').attr('font-size', '11px').text('Iteration');
+      gA.append('text').attr('x', -h / 2).attr('y', -36).attr('text-anchor', 'middle')
+        .attr('fill', '#c9d4e5').attr('font-size', '11px')
+        .attr('transform', `rotate(-90, -${h / 2}, -36)`).text('α');
+
+      const line = d3.line().x((d, i) => x(i)).y(d => y(d.alpha));
+      gA.append('path').datum(plateauHistory)
+        .attr('d', line).attr('stroke', COLORS.plateau).attr('stroke-width', 2).attr('fill', 'none');
+    }
+
+    window.addEventListener('plateauUpdated', renderAlpha);
+    renderAlpha();
+  })();
+
+  document.getElementById('plateauStepBtn').addEventListener('click', step);
+  document.getElementById('plateauRunBtn').addEventListener('click', () => {
+    if (plateauRunning) { plateauRunning = false; return; }
+    plateauRunning = true;
+    const iters = parseInt(document.getElementById('plateauIterations').value, 10);
+    let count = 0;
+    const interval = setInterval(() => {
+      if (count >= iters || !plateauRunning) {
+        clearInterval(interval);
+        plateauRunning = false;
+        return;
+      }
+      step();
+      count++;
+    }, ANIMATION_INTERVAL);
+  });
+
+  document.getElementById('plateauAlpha0').addEventListener('input', () => {
+    document.getElementById('plateauAlpha0Value').textContent = parseFloat(document.getElementById('plateauAlpha0').value).toFixed(3);
+  });
+  document.getElementById('plateauFactor').addEventListener('input', () => {
+    document.getElementById('plateauFactorValue').textContent = parseFloat(document.getElementById('plateauFactor').value).toFixed(2);
+  });
+  document.getElementById('plateauLower').addEventListener('input', () => {
+    document.getElementById('plateauLowerValue').textContent = parseFloat(document.getElementById('plateauLower').value).toFixed(4);
+  });
+  document.getElementById('plateauPatience').addEventListener('input', () => {
+    document.getElementById('plateauPatienceValue').textContent = String(parseInt(document.getElementById('plateauPatience').value, 10));
+  });
+  document.getElementById('plateauA0').addEventListener('input', () => {
+    document.getElementById('plateauA0Value').textContent = parseFloat(document.getElementById('plateauA0').value).toFixed(2);
+    if (!plateauRunning) {
+      plateauCurrent.a = parseFloat(document.getElementById('plateauA0').value);
+      plateauTrajectory = [{ a: plateauCurrent.a, b: plateauCurrent.b }];
+      render();
+    }
+  });
+  document.getElementById('plateauB0').addEventListener('input', () => {
+    document.getElementById('plateauB0Value').textContent = parseFloat(document.getElementById('plateauB0').value).toFixed(2);
+    if (!plateauRunning) {
+      plateauCurrent.b = parseFloat(document.getElementById('plateauB0').value);
+      plateauTrajectory = [{ a: plateauCurrent.a, b: plateauCurrent.b }];
+      render();
+    }
+  });
+
+  document.getElementById('plateauResetBtn').addEventListener('click', () => {
+    plateauRunning = false;
+    // Generate new random starting position
+    const startPos = randomStartPosition();
+    plateauCurrent.a = startPos.a;
+    plateauCurrent.b = startPos.b;
+    // Update sliders to match
+    document.getElementById('plateauA0').value = startPos.a;
+    document.getElementById('plateauB0').value = startPos.b;
+    document.getElementById('plateauA0Value').textContent = startPos.a.toFixed(2);
+    document.getElementById('plateauB0Value').textContent = startPos.b.toFixed(2);
+    plateauTrajectory = [{ a: plateauCurrent.a, b: plateauCurrent.b }];
+    plateauHistory = [];
+    bestMSE = Infinity;
+    stepsSinceImprovement = 0;
+    const alpha0 = parseFloat(document.getElementById('plateauAlpha0').value);
+    plateauHistory.push({ 
+      mse: computeMSE(currentDataPoints, plateauCurrent.a, plateauCurrent.b), 
+      a: plateauCurrent.a, 
+      b: plateauCurrent.b, 
+      alpha: alpha0, 
+      stepsSinceImprovement: 0 
+    });
+    window.dispatchEvent(new Event('plateauUpdated'));
+    document.getElementById('plateauAlphaNow').textContent = alpha0.toFixed(4);
+    document.getElementById('plateauStepsValue').textContent = '0';
+    render();
+  });
+
+  document.getElementById('plateauBatch').addEventListener('input', () => {
+    document.getElementById('plateauBatchValue').textContent = String(parseInt(document.getElementById('plateauBatch').value, 10));
+    if (!plateauRunning) render();
+  });
+  document.getElementById('plateauIterations').addEventListener('input', () => {
+    document.getElementById('plateauIterValue').textContent = String(parseInt(document.getElementById('plateauIterations').value, 10));
+  });
+
+  window.addEventListener('dataUpdated', () => {
+    plateauCurrent.a = parseFloat(document.getElementById('plateauA0').value);
+    plateauCurrent.b = parseFloat(document.getElementById('plateauB0').value);
+    plateauTrajectory = [{ a: plateauCurrent.a, b: plateauCurrent.b }];
+    plateauHistory = [];
+    bestMSE = Infinity;
+    stepsSinceImprovement = 0;
+    const alpha0 = parseFloat(document.getElementById('plateauAlpha0').value);
+    plateauHistory.push({ 
+      mse: computeMSE(currentDataPoints, plateauCurrent.a, plateauCurrent.b), 
+      a: plateauCurrent.a, 
+      b: plateauCurrent.b, 
+      alpha: alpha0, 
+      stepsSinceImprovement: 0 
+    });
+    document.getElementById('plateauAlphaNow').textContent = alpha0.toFixed(4);
+    document.getElementById('plateauStepsValue').textContent = '0';
+    render();
+  });
+
+  plateauCurrent.a = parseFloat(document.getElementById('plateauA0').value);
+  plateauCurrent.b = parseFloat(document.getElementById('plateauB0').value);
+  plateauTrajectory = [{ a: plateauCurrent.a, b: plateauCurrent.b }];
+  const alpha0 = parseFloat(document.getElementById('plateauAlpha0').value);
+  plateauHistory = [{ 
+    mse: computeMSE(currentDataPoints, plateauCurrent.a, plateauCurrent.b), 
+    a: plateauCurrent.a, 
+    b: plateauCurrent.b, 
+    alpha: alpha0, 
+    stepsSinceImprovement: 0 
+  }];
+  document.getElementById('plateauAlphaNow').textContent = alpha0.toFixed(4);
+  document.getElementById('plateauStepsValue').textContent = '0';
   render(); // Initial render after deferred init
 }
 
@@ -1642,6 +1925,12 @@ let asgdTrajectory = [];
 let asgdCurrent = { a: 0.25, b: 0.35 };
 let asgdRunning = false;
 
+// Plateau (ReduceLROnPlateau) state
+let plateauTrajectory = [];
+let plateauCurrent = { a: 0.4, b: 0.3 };
+let plateauRunning = false;
+let plateauHistory = [];
+
 // Reusable function to create learning curves visualization
 function createLearningCurvesViz(svgIds, historyGetter, eventName, algorithmName) {
   const width = 360, height = 280;
@@ -1764,6 +2053,15 @@ function initASGDCurvesViz() {
     () => asgdHistory,
     'asgdUpdated',
     'ASGD'
+  );
+}
+
+function initPlateauCurvesViz() {
+  createLearningCurvesViz(
+    { mse: '#viz-curves-plateau-mse', a: '#viz-curves-plateau-a', b: '#viz-curves-plateau-b' },
+    () => plateauHistory,
+    'plateauUpdated',
+    'Plateau'
   );
 }
 
@@ -2045,9 +2343,11 @@ function init() {
     initGDViz();
     initSGDViz();
     initAnnealedSGDViz();
+    initPlateauSGDViz();
     initGDCurvesViz();
     initSGDCurvesViz();
     initASGDCurvesViz();
+    initPlateauCurvesViz();
     initComplexLossViz();
   }, 50);
 }

@@ -591,8 +591,8 @@
           <input id="asgdAlpha0" type="range" min="0.001" max="0.2" step="0.001" value="0.05">
         </label>
         <label class="control">
-          <span>Annealing factor: <strong id="asgdAnnealValue">0.990</strong></span>
-          <input id="asgdAnneal" type="range" min="0.90" max="1.00" step="0.001" value="0.99">
+          <span>Annealing factor: <strong id="asgdAnnealValue">0.970</strong></span>
+          <input id="asgdAnneal" type="range" min="0.90" max="1.00" step="0.001" value="0.97">
         </label>
         <label class="control">
           <span>Lower bound: <strong id="asgdLowerValue">0.0010</strong></span>
@@ -611,8 +611,8 @@
           <input id="asgdB0" type="range" min="0.0" max="0.6" step="0.01" value="0.5">
         </label>
         <label class="control">
-          <span>Iterations: <strong id="asgdIterValue">500</strong></span>
-          <input id="asgdIterations" type="range" min="1" max="2000" step="1" value="500">
+          <span>Iterations: <strong id="asgdIterValue">150</strong></span>
+          <input id="asgdIterations" type="range" min="1" max="200" step="1" value="150">
         </label>
         <div class="control buttons">
           <button id="asgdStepBtn" type="button" aria-label="Perform single annealed stochastic gradient descent step">Single Step</button>
@@ -661,10 +661,108 @@
     </div>
 
     <div class="section">
+      <h2>Stochastic Gradient Descent with Reduce on Plateau</h2>
+      <p>
+        Another approach to adapting the learning rate is to reduce it only when necessary, rather than at every step. 
+        The <strong>Reduce on Plateau</strong> (ReduceLROnPlateau) scheduler monitors the loss function (MSE in our case) and reduces the learning rate when the loss stops improving.
+        <br>
+        This is more adaptive than annealing because:
+      </p>
+      <ul>
+        <li><strong>Annealing</strong> reduces $\alpha$ at every iteration, regardless of whether progress is being made.</li>
+        <li><strong>Plateau detection</strong> only reduces $\alpha$ when the MSE plateaus (shows no improvement for a certain number of steps).</li>
+      </ul>
+      <p>
+        The algorithm tracks the best MSE seen so far and counts steps without improvement. When this count reaches the <strong>patience</strong> parameter, 
+        the learning rate is multiplied by a <strong>factor</strong> (typically 0.5), but not below a <strong>lower bound</strong>:
+        $$\text{if no improvement for patience steps: } \alpha \leftarrow \max(\alpha \times \text{factor}, \text{lower bound})$$
+      </p>
+      <div class="controls">
+        <label class="control">
+          <span>Initial α: <strong id="plateauAlpha0Value">0.10</strong></span>
+          <input id="plateauAlpha0" type="range" min="0.001" max="0.2" step="0.001" value="0.10" aria-label="Initial learning rate for Plateau SGD">
+        </label>
+        <label class="control">
+          <span>Reduction factor: <strong id="plateauFactorValue">0.50</strong></span>
+          <input id="plateauFactor" type="range" min="0.1" max="0.9" step="0.05" value="0.5" aria-label="Learning rate reduction factor">
+        </label>
+        <label class="control">
+          <span>Lower bound: <strong id="plateauLowerValue">0.0010</strong></span>
+          <input id="plateauLower" type="range" min="0.0001" max="0.05" step="0.0001" value="0.001" aria-label="Lower bound for learning rate">
+        </label>
+        <label class="control">
+          <span>Patience (steps): <strong id="plateauPatienceValue">10</strong></span>
+          <input id="plateauPatience" type="range" min="0" max="50" step="2" value="10" aria-label="Number of steps without improvement before reducing learning rate">
+        </label>
+        <label class="control">
+          <span>Batch size n: <strong id="plateauBatchValue">3</strong></span>
+          <input id="plateauBatch" type="range" min="1" max="10" step="1" value="3" aria-label="Batch size for plateau SGD">
+        </label>
+        <label class="control">
+          <span>Initial a: <strong id="plateauA0Value">0.50</strong></span>
+          <input id="plateauA0" type="range" min="0.1" max="0.7" step="0.01" value="0.5" aria-label="Initial parameter a for plateau SGD">
+        </label>
+        <label class="control">
+          <span>Initial b: <strong id="plateauB0Value">0.30</strong></span>
+          <input id="plateauB0" type="range" min="0.0" max="0.6" step="0.01" value="0.3" aria-label="Initial parameter b for plateau SGD">
+        </label>
+        <label class="control">
+          <span>Iterations: <strong id="plateauIterValue">200</strong></span>
+          <input id="plateauIterations" type="range" min="1" max="500" step="1" value="200" aria-label="Number of iterations for plateau SGD">
+        </label>
+        <div class="control buttons">
+          <button id="plateauStepBtn" type="button" aria-label="Perform single plateau SGD step">Single Step</button>
+          <button id="plateauRunBtn" type="button" aria-label="Run plateau SGD algorithm">Run Plateau SGD</button>
+          <button id="plateauResetBtn" type="button" aria-label="Reset plateau SGD">Reset</button>
+        </div>
+      </div>
+      <div class="viz">
+        <svg id="viz-plateau" width="760" height="520"></svg>
+      </div>
+      <div class="metrics">
+        <span>Current MSE: <strong id="plateauMseValue">0.000</strong></span>
+        <span>Current a: <strong id="plateauCurrentA">0.400</strong></span>
+        <span>Current b: <strong id="plateauCurrentB">0.300</strong></span>
+        <span>Current α: <strong id="plateauAlphaNow">0.0500</strong></span>
+        <span>Steps since improvement: <strong id="plateauStepsValue">0</strong></span>
+      </div>
+      <div class="viz">
+        <svg id="viz-plateau-alpha" width="360" height="220"></svg>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Learning Curves</h2>
+      <p>The learning curves show how the MSE and parameter values evolve during Plateau SGD training:</p>
+      <div class="curves-grid">
+        <div class="viz">
+          <svg id="viz-curves-plateau-mse" width="360" height="280"></svg>
+        </div>
+        <div class="viz">
+          <svg id="viz-curves-plateau-a" width="360" height="280"></svg>
+        </div>
+        <div class="viz">
+          <svg id="viz-curves-plateau-b" width="360" height="280"></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Exercise</h2>
+      <ul>
+        <li>Compare the convergence behavior with Annealed SGD. Which converges faster? Which is more stable?</li>
+        <li>Try different patience values (5, 20, 50). How does patience affect the algorithm's behavior?</li>
+        <li>Experiment with different reduction factors (0.5 vs 0.9). What is the trade-off?</li>
+        <li>Why is Reduce on Plateau considered more adaptive than annealing?</li>
+        <li>What happens if the patience is too small? Too large?</li>
+      </ul>
+    </div>
+
+    <div class="section">
       <div class="callout-box important" style="text-align: center; padding: 24px;">
         <h2 style="margin-top: 0;">Congratulations!</h2>
         <p style="font-size: 1.1em; margin-bottom: 0;">that's it!</p>
-        <p style="font-size: 1.1em;">You have just learned <strong>Gradient Descent</strong>, <strong>Stochastic Gradient Descent</strong>, <strong>Batch Gradient Descent</strong> and <strong>Annealed Stochastic Gradient Descent</strong></p>
+        <p style="font-size: 1.1em;">You have just learned <strong>Gradient Descent</strong>, <strong>Stochastic Gradient Descent</strong>, <strong>Batch Gradient Descent</strong>, <strong>Annealed Stochastic Gradient Descent</strong>, and <strong>Reduce on Plateau</strong></p>
       </div>
     </div>
 
