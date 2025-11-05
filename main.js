@@ -8,6 +8,7 @@
  * - Gradient Descent (GD)
  * - Stochastic Gradient Descent (SGD)
  * - Annealed Stochastic Gradient Descent (ASGD)
+ * - Reduce on Plateau (ReduceLROnPlateau)
  * 
  * The tutorial uses a simple linear regression problem (y = ax + b) to
  * demonstrate how these optimization algorithms work, visualizing:
@@ -15,6 +16,7 @@
  * - Optimization trajectories
  * - Learning curves
  * - The effect of batch size and learning rate
+ * - Adaptive learning rate scheduling
  * 
  * Architecture:
  * 1. Global utilities (MSE, gradient computation, landscape rendering)
@@ -24,10 +26,11 @@
  * 5. Gradient Descent implementation and visualization
  * 6. Stochastic Gradient Descent with mini-batches
  * 7. Annealed SGD with learning rate decay
- * 8. Learning curves for all algorithms
+ * 8. Reduce on Plateau with adaptive learning rate
+ * 9. Learning curves for all algorithms
  * 
  * @author Marco Lehmann
- * @version 2.0 - Refactored for maintainability
+ * @version 2.1 - Added Reduce on Plateau scheduler
  */
 
 // ============================================================================
@@ -36,13 +39,58 @@
 
 // True parameters for data generation
 const TRUE_A = 0.4;
-const TRUE_B = 0.6;
+const TRUE_B = 0.3;
 
 // Visualization domains
 const xDomain = [-5, 5];
 const sampleXMin = -4;
 const sampleXMax = 4;
 const yDomain = [-4, 4];
+
+// Parameter ranges (used across multiple visualizations)
+const PARAM_RANGES = {
+  aMin: 0.0,
+  aMax: 0.8,
+  bMin: 0.0,
+  bMax: 0.8
+};
+
+// Visualization dimensions and margins
+const VIZ_DIMENSIONS = {
+  // Standard plot dimensions
+  standard: { width: 760, height: 520, margin: { top: 30, right: 80, bottom: 50, left: 60 } },
+  // Data plot dimensions
+  data: { width: 760, height: 400, margin: { top: 20, right: 20, bottom: 40, left: 50 } },
+  // Model plot dimensions
+  model: { width: 760, height: 520, margin: { top: 24, right: 24, bottom: 44, left: 56 } },
+  // Landscape plot dimensions
+  landscape: { width: 840, height: 520, margin: { top: 30, right: 100, bottom: 50, left: 60 } },
+  // Small plot dimensions (grid layouts)
+  small: { width: 360, height: 320, margin: { top: 30, right: 20, bottom: 40, left: 50 } },
+  // Learning curve dimensions
+  curve: { width: 360, height: 280, margin: { top: 30, right: 20, bottom: 40, left: 50 } },
+  // Alpha plot dimensions
+  alpha: { width: 360, height: 220, margin: { top: 24, right: 20, bottom: 36, left: 48 } }
+};
+
+// Colors
+const COLORS = {
+  text: '#ffffff',
+  textMuted: '#c9d4e5',
+  trajectory: '#ff00ff',
+  trajectoryPoint: '#ffffff',
+  gradient: '#ffff00',
+  sgd: '#00aaff',
+  asgd: '#ffaa00',
+  plateau: '#00ff88',
+  modelLine: '#3a89ff',
+  truthLine: '#2ecc71',
+  residual: '#ff4d4d',
+  point: '#2ecc71'
+};
+
+// Animation timing (single value for all animations)
+const ANIMATION_INTERVAL = 50;
 
 // Data state
 let noiseStdDev = 0.5;
@@ -54,6 +102,82 @@ let randNorm = d3.randomNormal.source(d3.randomLcg(Math.random()))(0, noiseStdDe
 // ============================================================================
 
 /**
+ * Safely retrieves a DOM element by ID, with error handling.
+ * @param {string} id - Element ID
+ * @returns {HTMLElement|null} The element or null if not found
+ */
+function getElement(id) {
+  const element = document.getElementById(id);
+  if (!element) {
+    console.warn(`Element with id "${id}" not found`);
+  }
+  return element;
+}
+
+/**
+ * Updates a display element with a formatted value.
+ * @param {string} id - Element ID to update
+ * @param {number|string} value - Value to display
+ * @param {string|Function} format - Format function or format string ('fixed', 'int', 'float')
+ */
+function updateDisplay(id, value, format = 'fixed') {
+  const element = getElement(id);
+  if (!element) return;
+  
+  let formatted;
+  if (typeof format === 'function') {
+    formatted = format(value);
+  } else if (format === 'int') {
+    formatted = String(parseInt(value, 10));
+  } else if (format === 'float') {
+    formatted = parseFloat(value).toString();
+  } else if (typeof format === 'number') {
+    formatted = parseFloat(value).toFixed(format);
+  } else {
+    formatted = parseFloat(value).toFixed(2);
+  }
+  
+  element.textContent = formatted;
+}
+
+/**
+ * Binds a slider to update its display value and optionally call a callback.
+ * @param {string} sliderId - Slider input element ID
+ * @param {string} displayId - Display element ID (optional)
+ * @param {Object} options - Configuration options
+ * @param {string|number|Function} options.format - Format for display ('fixed', number of decimals, or function)
+ * @param {Function} options.onChange - Optional callback function(value)
+ * @param {Function} options.onInput - Optional callback for input event (different from onChange)
+ */
+function bindSlider(sliderId, displayId = null, options = {}) {
+  const slider = getElement(sliderId);
+  if (!slider) return;
+  
+  const { format = 'fixed', onChange = null, onInput = null } = options;
+  
+  slider.addEventListener('input', () => {
+    const value = parseFloat(slider.value);
+    
+    // Update display if provided
+    if (displayId) {
+      updateDisplay(displayId, value, format);
+    }
+    
+    // Call onInput callback if provided
+    if (onInput) {
+      onInput(value);
+    }
+  });
+  
+  // Call onChange callback if provided (for change event, not input)
+  if (onChange) {
+    slider.addEventListener('change', () => {
+      onChange(parseFloat(slider.value));
+    });
+  }
+}
+
+/**
  * Computes the Mean Squared Error (MSE) for a linear model.
  * MSE = (1/2N) * Σ(y_i - (a*x_i + b))²
  * 
@@ -63,13 +187,17 @@ let randNorm = d3.randomNormal.source(d3.randomLcg(Math.random()))(0, noiseStdDe
  * @returns {number} The computed MSE
  */
 function computeMSE(points, a, b) {
-  if (points.length === 0) return 0;
+  if (!points || points.length === 0) return 0;
+  if (!isFinite(a) || !isFinite(b)) return Infinity;
+  
   let sum = 0;
   for (const d of points) {
+    if (!isFinite(d.x) || !isFinite(d.y)) continue;
     const err = d.y - (a * d.x + b);
     sum += err * err;
   }
-  return sum / (2 * points.length);
+  const result = sum / (2 * points.length);
+  return isFinite(result) ? result : Infinity;
 }
 
 /**
@@ -248,15 +376,81 @@ function renderDataPlot(config) {
   // Title
   if (title) {
     g.append('text').attr('x', w / 2).attr('y', -10).attr('text-anchor', 'middle')
-      .attr('fill', '#ffffff').attr('font-size', '12px').text(title);
+      .attr('fill', '#ffffff').attr('font-size', '15px').text(title);
   }
 
   // MSE
   if (showMSE && modelA !== null && modelB !== null) {
     const mse = computeMSE(dataPoints, modelA, modelB);
-    g.append('text').attr('x', 10).attr('y', 20).attr('fill', '#ffffff').attr('font-size', '14px')
+    g.append('text').attr('x', 10).attr('y', 20).attr('fill', '#ffffff').attr('font-size', '15px')
       .attr('font-weight', 'bold')
       .text(`MSE: ${mse.toFixed(4)}`);
+  }
+
+  // Legend (lower right quadrant)
+  if (showTruthLine || showModelLine || dataPoints.length > 0) {
+    const legendX = w * 0.65; // Position in lower right quadrant
+    const legendY = h * 0.75;
+    const lineLength = 30;
+    const lineSpacing = 22;
+    let legendYOffset = 0;
+
+    const legend = g.append('g').attr('class', 'legend');
+
+    // Ground truth line (if shown)
+    if (showTruthLine) {
+      legend.append('line')
+        .attr('x1', legendX)
+        .attr('x2', legendX + lineLength)
+        .attr('y1', legendY + legendYOffset)
+        .attr('y2', legendY + legendYOffset)
+        .attr('stroke', COLORS.truthLine)
+        .attr('stroke-width', 2.5)
+        .attr('stroke-dasharray', '6,4')
+        .attr('opacity', 0.9);
+      legend.append('text')
+        .attr('x', legendX + lineLength + 8)
+        .attr('y', legendY + legendYOffset + 5)
+        .attr('fill', '#c9d4e5')
+        .attr('font-size', '13px')
+        .text('Ground truth');
+      legendYOffset += lineSpacing;
+    }
+
+    // Model line (if shown)
+    if (showModelLine) {
+      legend.append('line')
+        .attr('x1', legendX)
+        .attr('x2', legendX + lineLength)
+        .attr('y1', legendY + legendYOffset)
+        .attr('y2', legendY + legendYOffset)
+        .attr('stroke', COLORS.modelLine)
+        .attr('stroke-width', 3)
+        .attr('opacity', 0.8);
+      legend.append('text')
+        .attr('x', legendX + lineLength + 8)
+        .attr('y', legendY + legendYOffset + 5)
+        .attr('fill', '#c9d4e5')
+        .attr('font-size', '13px')
+        .text('Model');
+      legendYOffset += lineSpacing;
+    }
+
+    // Data points
+    if (dataPoints.length > 0) {
+      legend.append('circle')
+        .attr('cx', legendX + lineLength / 2)
+        .attr('cy', legendY + legendYOffset)
+        .attr('r', 6)
+        .attr('fill', COLORS.point)
+        .attr('opacity', 0.8);
+      legend.append('text')
+        .attr('x', legendX + lineLength + 8)
+        .attr('y', legendY + legendYOffset + 5)
+        .attr('fill', '#c9d4e5')
+        .attr('font-size', '13px')
+        .text('Data');
+    }
   }
 
   return { xScale, yScale, g };
@@ -272,14 +466,22 @@ function renderDataPlot(config) {
  * @returns {{da: number, db: number}} Gradient components
  */
 function computeGradient(points, a, b) {
-  if (points.length === 0) return { da: 0, db: 0 };
+  if (!points || points.length === 0) return { da: 0, db: 0 };
+  if (!isFinite(a) || !isFinite(b)) return { da: 0, db: 0 };
+  
   let sumDa = 0, sumDb = 0;
   for (const d of points) {
+    if (!isFinite(d.x) || !isFinite(d.y)) continue;
     const err = d.y - (a * d.x + b);
     sumDa += err * (-d.x);
     sumDb += err * (-1);
   }
-  return { da: sumDa / points.length, db: sumDb / points.length };
+  const da = sumDa / points.length;
+  const db = sumDb / points.length;
+  return { 
+    da: isFinite(da) ? da : 0, 
+    db: isFinite(db) ? db : 0 
+  };
 }
 
 /**
@@ -293,17 +495,27 @@ function computeGradient(points, a, b) {
  * @returns {{da: number, db: number}} Approximate gradient components
  */
 function computeGradientBatch(points, a, b, batchSize) {
-  if (points.length === 0) return { da: 0, db: 0 };
+  if (!points || points.length === 0) return { da: 0, db: 0 };
+  if (!isFinite(a) || !isFinite(b) || !isFinite(batchSize) || batchSize <= 0) {
+    return { da: 0, db: 0 };
+  }
+  
   const n = Math.min(batchSize, points.length);
   const indices = d3.shuffle(d3.range(points.length)).slice(0, n);
   let sumDa = 0, sumDb = 0;
   for (const idx of indices) {
     const d = points[idx];
+    if (!isFinite(d.x) || !isFinite(d.y)) continue;
     const err = d.y - (a * d.x + b);
     sumDa += err * (-d.x);
     sumDb += err * (-1);
   }
-  return { da: sumDa / n, db: sumDb / n };
+  const da = sumDa / n;
+  const db = sumDb / n;
+  return { 
+    da: isFinite(da) ? da : 0, 
+    db: isFinite(db) ? db : 0 
+  };
 }
 
 /**
@@ -397,7 +609,7 @@ function drawTrajectoryOnLandscape(g, trajectory, current, landscapeData) {
       .y(d => yOffset + bScale(d.b));
     g.append('path')
       .attr('d', lineGen(trajectory))
-      .attr('stroke', '#ff00ff')
+      .attr('stroke', COLORS.trajectory)
       .attr('stroke-width', 3)
       .attr('fill', 'none');
 
@@ -407,7 +619,7 @@ function drawTrajectoryOnLandscape(g, trajectory, current, landscapeData) {
       .attr('cx', d => xOffset + aScale(d.a))
       .attr('cy', d => yOffset + bScale(d.b))
       .attr('r', 2)
-      .attr('fill', '#ffffff');
+      .attr('fill', COLORS.trajectoryPoint);
   }
 
   // Draw current position
@@ -415,8 +627,8 @@ function drawTrajectoryOnLandscape(g, trajectory, current, landscapeData) {
     .attr('cx', xOffset + aScale(current.a))
     .attr('cy', yOffset + bScale(current.b))
     .attr('r', 6)
-    .attr('fill', '#ff00ff')
-    .attr('stroke', '#ffffff')
+    .attr('fill', COLORS.trajectory)
+    .attr('stroke', COLORS.trajectoryPoint)
     .attr('stroke-width', 2);
 }
 
@@ -425,10 +637,15 @@ function drawTrajectoryOnLandscape(g, trajectory, current, landscapeData) {
 // ============================================================================
 function initDataViz() {
   const svg = d3.select('#viz-data');
-  const width = 760, height = 400;
-  const margin = { top: 20, right: 20, bottom: 40, left: 50 };
+  const dims = VIZ_DIMENSIONS.data;
+  const width = dims.width;
+  const height = dims.height;
+  const margin = dims.margin;
 
   function generateData(n, sigma) {
+    if (!isFinite(n) || n < 1) n = 1;
+    if (!isFinite(sigma) || sigma < 0) sigma = 0;
+    
     const rng = d3.randomNormal.source(d3.randomLcg(Math.random()))(0, sigma);
     if (n === 1) return [{ x: 0, y: TRUE_A * 0 + TRUE_B + rng() }];
     // Sample n points uniformly in the range [sampleXMin, sampleXMax]
@@ -440,11 +657,16 @@ function initDataViz() {
   }
 
   function render() {
-    const n = parseInt(document.getElementById('dataPoints').value, 10);
-    noiseStdDev = parseFloat(document.getElementById('noiseSigma').value);
+    const dataPointsEl = getElement('dataPoints');
+    const noiseSigmaEl = getElement('noiseSigma');
+    if (!dataPointsEl || !noiseSigmaEl) return;
+    
+    const n = parseInt(dataPointsEl.value, 10);
+    noiseStdDev = parseFloat(noiseSigmaEl.value);
     currentDataPoints = generateData(n, noiseStdDev);
-    document.getElementById('dataPointsValue').textContent = String(n);
-    document.getElementById('noiseSigmaValue').textContent = noiseStdDev.toFixed(1);
+    
+    updateDisplay('dataPointsValue', n, 'int');
+    updateDisplay('noiseSigmaValue', noiseStdDev, 1);
 
     renderDataPlot({
       svg,
@@ -459,18 +681,23 @@ function initDataViz() {
     });
   }
 
-  document.getElementById('dataPoints').addEventListener('input', render);
-  document.getElementById('noiseSigma').addEventListener('input', () => {
-    document.getElementById('noiseSigmaValue').textContent = parseFloat(document.getElementById('noiseSigma').value).toFixed(1);
-    render(); // Trigger data regeneration when noise changes
-    window.dispatchEvent(new Event('dataUpdated'));
+  bindSlider('dataPoints', 'dataPointsValue', { format: 'int', onInput: render });
+  bindSlider('noiseSigma', 'noiseSigmaValue', { 
+    format: 1, 
+    onInput: (value) => {
+      render();
+      window.dispatchEvent(new Event('dataUpdated'));
+    }
   });
-  document.getElementById('sampleDataBtn').addEventListener('click', () => {
-    render();
-    // Trigger updates in other sections
-    const event = new Event('dataUpdated');
-    window.dispatchEvent(event);
-  });
+  
+  const sampleBtn = getElement('sampleDataBtn');
+  if (sampleBtn) {
+    sampleBtn.addEventListener('click', () => {
+      render();
+      window.dispatchEvent(new Event('dataUpdated'));
+    });
+  }
+  
   render();
 }
 
@@ -479,7 +706,8 @@ function initDataViz() {
 // ============================================================================
 function initAnnealedSGDViz() {
   const svg = d3.select('#viz-asgd');
-  const width = 760, height = 520;
+  const width = 600;
+  const height = 400;
   const margin = { top: 30, right: 80, bottom: 50, left: 60 };
   const w = width - margin.left - margin.right;
   const h = height - margin.top - margin.bottom;
@@ -487,7 +715,15 @@ function initAnnealedSGDViz() {
   svg.attr('viewBox', `0 0 ${width} ${height}`);
   const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-  const aMin = 0.1, aMax = 0.7, bMin = 0.3, bMax = 0.9;
+  const { aMin, aMax, bMin, bMax } = PARAM_RANGES;
+
+  // Helper to generate random starting position within valid ranges
+  function randomStartPosition() {
+    return {
+      a: aMin + Math.random() * (aMax - aMin),
+      b: bMin + Math.random() * (bMax - bMin)
+    };
+  }
 
   function render() {
     if (currentDataPoints.length === 0) return;
@@ -530,8 +766,8 @@ function initAnnealedSGDViz() {
 
   (function initAlphaPlot() {
     const svgAlpha = d3.select('#viz-asgd-alpha');
-    const wA = 360, hA = 220;
-    const marginA = { top: 24, right: 20, bottom: 36, left: 48 };
+    const wA = 340, hA = 400;
+    const marginA = { top: 30, right: 20, bottom: 50, left: 50 };
     svgAlpha.attr('viewBox', `0 0 ${wA} ${hA}`);
     const gA = svgAlpha.append('g').attr('transform', `translate(${marginA.left},${marginA.top})`);
     const w = wA - marginA.left - marginA.right;
@@ -541,7 +777,7 @@ function initAnnealedSGDViz() {
       gA.selectAll('*').remove();
       if (asgdHistory.length === 0) {
         gA.append('text').attr('x', w / 2).attr('y', h / 2)
-          .attr('text-anchor', 'middle').attr('fill', '#c9d4e5').attr('font-size', '12px')
+          .attr('text-anchor', 'middle').attr('fill', '#c9d4e5').attr('font-size', '13px')
           .text('Run ASGD to see α decay');
         return;
       }
@@ -557,13 +793,13 @@ function initAnnealedSGDViz() {
         .call(d3.axisBottom(x).ticks(5));
       gA.append('g').attr('class', 'axis').call(d3.axisLeft(y).ticks(5));
       gA.append('text').attr('x', w / 2).attr('y', -8).attr('text-anchor', 'middle')
-        .attr('fill', '#ffffff').attr('font-size', '12px').text('Learning Rate (α) over Iterations');
-      gA.append('text').attr('x', w / 2).attr('y', h + 28).attr('text-anchor', 'middle')
-        .attr('fill', '#c9d4e5').attr('font-size', '11px').text('Iteration');
-      gA.append('text').attr('x', w / 2).attr('y', h + 28).attr('text-anchor', 'middle');
-      gA.append('text').attr('x', -h / 2).attr('y', -36).attr('text-anchor', 'middle')
-        .attr('fill', '#c9d4e5').attr('font-size', '11px')
-        .attr('transform', `rotate(-90, -${h / 2}, -36)`).text('α');
+        .attr('fill', '#ffffff').attr('font-size', '15px').text('Learning Rate (α) over Iterations');
+      gA.append('text').attr('x', w / 2).attr('y', h + 40).attr('text-anchor', 'middle')
+        .attr('fill', '#c9d4e5').attr('font-size', '13px').text('Iteration');
+      gA.append('text').attr('x', w / 2).attr('y', h + 40).attr('text-anchor', 'middle');
+      gA.append('text').attr('x', -h / 2).attr('y', -40).attr('text-anchor', 'middle')
+        .attr('fill', '#c9d4e5').attr('font-size', '13px')
+        .attr('transform', `rotate(-90, -${h / 2}, -40)`).text('α');
 
       const line = d3.line().x((d, i) => x(i)).y(d => y(d.alpha));
       gA.append('path').datum(asgdHistory)
@@ -588,7 +824,7 @@ function initAnnealedSGDViz() {
       }
       step();
       count++;
-    }, 30);
+    }, ANIMATION_INTERVAL);
   });
 
   document.getElementById('asgdAlpha0').addEventListener('input', () => {
@@ -619,8 +855,15 @@ function initAnnealedSGDViz() {
 
   document.getElementById('asgdResetBtn').addEventListener('click', () => {
     asgdRunning = false;
-    asgdCurrent.a = parseFloat(document.getElementById('asgdA0').value);
-    asgdCurrent.b = parseFloat(document.getElementById('asgdB0').value);
+    // Generate new random starting position
+    const startPos = randomStartPosition();
+    asgdCurrent.a = startPos.a;
+    asgdCurrent.b = startPos.b;
+    // Update sliders to match
+    document.getElementById('asgdA0').value = startPos.a;
+    document.getElementById('asgdB0').value = startPos.b;
+    document.getElementById('asgdA0Value').textContent = startPos.a.toFixed(2);
+    document.getElementById('asgdB0Value').textContent = startPos.b.toFixed(2);
     asgdTrajectory = [{ a: asgdCurrent.a, b: asgdCurrent.b }];
     asgdHistory = [];
     const alpha0 = parseFloat(document.getElementById('asgdAlpha0').value);
@@ -659,18 +902,306 @@ function initAnnealedSGDViz() {
 }
 
 // ============================================================================
+// Reduce on Plateau Visualization
+// ============================================================================
+function initPlateauSGDViz() {
+  const svg = d3.select('#viz-plateau');
+  const width = 600;
+  const height = 400;
+  const margin = { top: 30, right: 80, bottom: 50, left: 60 };
+  const w = width - margin.left - margin.right;
+  const h = height - margin.top - margin.bottom;
+
+  svg.attr('viewBox', `0 0 ${width} ${height}`);
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const { aMin, aMax, bMin, bMax } = PARAM_RANGES;
+
+  // Helper to generate random starting position within valid ranges
+  function randomStartPosition() {
+    return {
+      a: aMin + Math.random() * (aMax - aMin),
+      b: bMin + Math.random() * (bMax - bMin)
+    };
+  }
+
+  // Plateau detection state
+  let bestMSE = Infinity;
+  let stepsSinceImprovement = 0;
+
+  function render() {
+    if (currentDataPoints.length === 0) return;
+    g.selectAll('*').remove();
+
+    // Render landscape and get scale info
+    const landscapeData = renderErrorLandscape(g, w, h, currentDataPoints, aMin, aMax, bMin, bMax, 25);
+    
+    // Draw trajectory using plateau color
+    if (plateauTrajectory.length > 0) {
+      const line = d3.line()
+        .x(d => landscapeData.xOffset + landscapeData.aScale(d.a))
+        .y(d => landscapeData.yOffset + landscapeData.bScale(d.b));
+      
+      g.append('path')
+        .datum(plateauTrajectory)
+        .attr('d', line)
+        .attr('stroke', COLORS.plateau)
+        .attr('stroke-width', 2)
+        .attr('fill', 'none')
+        .attr('opacity', 0.7);
+      
+      // Draw current point
+      const cx = landscapeData.xOffset + landscapeData.aScale(plateauCurrent.a);
+      const cy = landscapeData.yOffset + landscapeData.bScale(plateauCurrent.b);
+      g.append('circle')
+        .attr('cx', cx)
+        .attr('cy', cy)
+        .attr('r', 6)
+        .attr('fill', COLORS.plateau)
+        .attr('stroke', COLORS.trajectoryPoint)
+        .attr('stroke-width', 2);
+    }
+  }
+
+  function step() {
+    const batchSize = parseInt(document.getElementById('plateauBatch').value, 10);
+    const { da, db } = computeGradientBatch(currentDataPoints, plateauCurrent.a, plateauCurrent.b, batchSize);
+
+    const alpha = plateauHistory.length === 0
+      ? parseFloat(document.getElementById('plateauAlpha0').value)
+      : plateauHistory[plateauHistory.length - 1].alpha;
+
+    plateauCurrent.a -= alpha * da;
+    plateauCurrent.b -= alpha * db;
+    plateauTrajectory.push({ a: plateauCurrent.a, b: plateauCurrent.b });
+
+    const mse = computeMSE(currentDataPoints, plateauCurrent.a, plateauCurrent.b);
+
+    // Plateau detection logic
+    let nextAlpha = alpha;
+    const patience = parseInt(document.getElementById('plateauPatience').value, 10);
+    const factor = parseFloat(document.getElementById('plateauFactor').value);
+    const lower = parseFloat(document.getElementById('plateauLower').value);
+
+    if (mse < bestMSE) {
+      // Improvement detected
+      bestMSE = mse;
+      stepsSinceImprovement = 0;
+    } else {
+      // No improvement
+      stepsSinceImprovement++;
+      if (stepsSinceImprovement >= patience) {
+        // Plateau detected - reduce learning rate
+        nextAlpha = Math.max(alpha * factor, lower);
+        stepsSinceImprovement = 0; // Reset counter after reduction
+      }
+    }
+
+    plateauHistory.push({ 
+      mse, 
+      a: plateauCurrent.a, 
+      b: plateauCurrent.b, 
+      alpha: nextAlpha, 
+      stepsSinceImprovement 
+    });
+    window.dispatchEvent(new Event('plateauUpdated'));
+
+    document.getElementById('plateauMseValue').textContent = mse.toFixed(4);
+    document.getElementById('plateauCurrentA').textContent = plateauCurrent.a.toFixed(3);
+    document.getElementById('plateauCurrentB').textContent = plateauCurrent.b.toFixed(3);
+    document.getElementById('plateauAlphaNow').textContent = nextAlpha.toFixed(4);
+    document.getElementById('plateauStepsValue').textContent = String(stepsSinceImprovement);
+    render();
+  }
+
+  // Alpha plot (shows learning rate over iterations with step reductions)
+  (function initAlphaPlot() {
+    const svgAlpha = d3.select('#viz-plateau-alpha');
+    const wA = 340, hA = 400;
+    const marginA = { top: 30, right: 20, bottom: 50, left: 50 };
+    svgAlpha.attr('viewBox', `0 0 ${wA} ${hA}`);
+    const gA = svgAlpha.append('g').attr('transform', `translate(${marginA.left},${marginA.top})`);
+    const w = wA - marginA.left - marginA.right;
+    const h = hA - marginA.top - marginA.bottom;
+
+    function renderAlpha() {
+      gA.selectAll('*').remove();
+      if (plateauHistory.length === 0) {
+        gA.append('text').attr('x', w / 2).attr('y', h / 2)
+          .attr('text-anchor', 'middle').attr('fill', '#c9d4e5').attr('font-size', '13px')
+          .text('Run Plateau SGD to see α changes');
+        return;
+      }
+      const x = d3.scaleLinear().domain([0, plateauHistory.length]).range([0, w]);
+      const y = d3.scaleLinear().domain([0, d3.max(plateauHistory, d => d.alpha) || 1]).range([h, 0]);
+
+      gA.append('g').attr('class', 'grid').attr('transform', `translate(0,${h})`)
+        .call(d3.axisBottom(x).ticks(5).tickSize(-h).tickFormat(''));
+      gA.append('g').attr('class', 'grid')
+        .call(d3.axisLeft(y).ticks(5).tickSize(-w).tickFormat(''));
+
+      gA.append('g').attr('class', 'axis').attr('transform', `translate(0,${h})`)
+        .call(d3.axisBottom(x).ticks(5));
+      gA.append('g').attr('class', 'axis').call(d3.axisLeft(y).ticks(5));
+      gA.append('text').attr('x', w / 2).attr('y', -8).attr('text-anchor', 'middle')
+        .attr('fill', '#ffffff').attr('font-size', '15px').text('Learning Rate (α) over Iterations');
+      gA.append('text').attr('x', w / 2).attr('y', h + 40).attr('text-anchor', 'middle')
+        .attr('fill', '#c9d4e5').attr('font-size', '13px').text('Iteration');
+      gA.append('text').attr('x', -h / 2).attr('y', -40).attr('text-anchor', 'middle')
+        .attr('fill', '#c9d4e5').attr('font-size', '13px')
+        .attr('transform', `rotate(-90, -${h / 2}, -40)`).text('α');
+
+      const line = d3.line().x((d, i) => x(i)).y(d => y(d.alpha));
+      gA.append('path').datum(plateauHistory)
+        .attr('d', line).attr('stroke', COLORS.plateau).attr('stroke-width', 2).attr('fill', 'none');
+    }
+
+    window.addEventListener('plateauUpdated', renderAlpha);
+    renderAlpha();
+  })();
+
+  document.getElementById('plateauStepBtn').addEventListener('click', step);
+  document.getElementById('plateauRunBtn').addEventListener('click', () => {
+    if (plateauRunning) { plateauRunning = false; return; }
+    plateauRunning = true;
+    const iters = parseInt(document.getElementById('plateauIterations').value, 10);
+    let count = 0;
+    const interval = setInterval(() => {
+      if (count >= iters || !plateauRunning) {
+        clearInterval(interval);
+        plateauRunning = false;
+        return;
+      }
+      step();
+      count++;
+    }, ANIMATION_INTERVAL);
+  });
+
+  document.getElementById('plateauAlpha0').addEventListener('input', () => {
+    document.getElementById('plateauAlpha0Value').textContent = parseFloat(document.getElementById('plateauAlpha0').value).toFixed(3);
+  });
+  document.getElementById('plateauFactor').addEventListener('input', () => {
+    document.getElementById('plateauFactorValue').textContent = parseFloat(document.getElementById('plateauFactor').value).toFixed(2);
+  });
+  document.getElementById('plateauLower').addEventListener('input', () => {
+    document.getElementById('plateauLowerValue').textContent = parseFloat(document.getElementById('plateauLower').value).toFixed(4);
+  });
+  document.getElementById('plateauPatience').addEventListener('input', () => {
+    document.getElementById('plateauPatienceValue').textContent = String(parseInt(document.getElementById('plateauPatience').value, 10));
+  });
+  document.getElementById('plateauA0').addEventListener('input', () => {
+    document.getElementById('plateauA0Value').textContent = parseFloat(document.getElementById('plateauA0').value).toFixed(2);
+    if (!plateauRunning) {
+      plateauCurrent.a = parseFloat(document.getElementById('plateauA0').value);
+      plateauTrajectory = [{ a: plateauCurrent.a, b: plateauCurrent.b }];
+      render();
+    }
+  });
+  document.getElementById('plateauB0').addEventListener('input', () => {
+    document.getElementById('plateauB0Value').textContent = parseFloat(document.getElementById('plateauB0').value).toFixed(2);
+    if (!plateauRunning) {
+      plateauCurrent.b = parseFloat(document.getElementById('plateauB0').value);
+      plateauTrajectory = [{ a: plateauCurrent.a, b: plateauCurrent.b }];
+      render();
+    }
+  });
+
+  document.getElementById('plateauResetBtn').addEventListener('click', () => {
+    plateauRunning = false;
+    // Generate new random starting position
+    const startPos = randomStartPosition();
+    plateauCurrent.a = startPos.a;
+    plateauCurrent.b = startPos.b;
+    // Update sliders to match
+    document.getElementById('plateauA0').value = startPos.a;
+    document.getElementById('plateauB0').value = startPos.b;
+    document.getElementById('plateauA0Value').textContent = startPos.a.toFixed(2);
+    document.getElementById('plateauB0Value').textContent = startPos.b.toFixed(2);
+    plateauTrajectory = [{ a: plateauCurrent.a, b: plateauCurrent.b }];
+    plateauHistory = [];
+    bestMSE = Infinity;
+    stepsSinceImprovement = 0;
+    const alpha0 = parseFloat(document.getElementById('plateauAlpha0').value);
+    plateauHistory.push({ 
+      mse: computeMSE(currentDataPoints, plateauCurrent.a, plateauCurrent.b), 
+      a: plateauCurrent.a, 
+      b: plateauCurrent.b, 
+      alpha: alpha0, 
+      stepsSinceImprovement: 0 
+    });
+    window.dispatchEvent(new Event('plateauUpdated'));
+    document.getElementById('plateauAlphaNow').textContent = alpha0.toFixed(4);
+    document.getElementById('plateauStepsValue').textContent = '0';
+    render();
+  });
+
+  document.getElementById('plateauBatch').addEventListener('input', () => {
+    document.getElementById('plateauBatchValue').textContent = String(parseInt(document.getElementById('plateauBatch').value, 10));
+    if (!plateauRunning) render();
+  });
+  document.getElementById('plateauIterations').addEventListener('input', () => {
+    document.getElementById('plateauIterValue').textContent = String(parseInt(document.getElementById('plateauIterations').value, 10));
+  });
+
+  window.addEventListener('dataUpdated', () => {
+    plateauCurrent.a = parseFloat(document.getElementById('plateauA0').value);
+    plateauCurrent.b = parseFloat(document.getElementById('plateauB0').value);
+    plateauTrajectory = [{ a: plateauCurrent.a, b: plateauCurrent.b }];
+    plateauHistory = [];
+    // Reset plateau detection state when data changes
+    bestMSE = Infinity;
+    stepsSinceImprovement = 0;
+    const alpha0 = parseFloat(document.getElementById('plateauAlpha0').value);
+    plateauHistory.push({ 
+      mse: computeMSE(currentDataPoints, plateauCurrent.a, plateauCurrent.b), 
+      a: plateauCurrent.a, 
+      b: plateauCurrent.b, 
+      alpha: alpha0, 
+      stepsSinceImprovement: 0 
+    });
+    document.getElementById('plateauAlphaNow').textContent = alpha0.toFixed(4);
+    document.getElementById('plateauStepsValue').textContent = '0';
+    render();
+  });
+
+  plateauCurrent.a = parseFloat(document.getElementById('plateauA0').value);
+  plateauCurrent.b = parseFloat(document.getElementById('plateauB0').value);
+  plateauTrajectory = [{ a: plateauCurrent.a, b: plateauCurrent.b }];
+  const alpha0 = parseFloat(document.getElementById('plateauAlpha0').value);
+  plateauHistory = [{ 
+    mse: computeMSE(currentDataPoints, plateauCurrent.a, plateauCurrent.b), 
+    a: plateauCurrent.a, 
+    b: plateauCurrent.b, 
+    alpha: alpha0, 
+    stepsSinceImprovement: 0 
+  }];
+  document.getElementById('plateauAlphaNow').textContent = alpha0.toFixed(4);
+  document.getElementById('plateauStepsValue').textContent = '0';
+  render(); // Initial render after deferred init
+}
+
+// ============================================================================
 // Section 2: The Model
 // ============================================================================
 function initModelViz() {
   const svg = d3.select('#viz-model');
-  const width = 760, height = 520;
-  const margin = { top: 24, right: 24, bottom: 44, left: 56 };
+  const dims = VIZ_DIMENSIONS.model;
+  const width = dims.width;
+  const height = dims.height;
+  const margin = dims.margin;
 
   function render() {
-    const a = parseFloat(document.getElementById('modelA').value);
-    const b = parseFloat(document.getElementById('modelB').value);
-    document.getElementById('modelAValue').textContent = Number(a).toFixed(2);
-    document.getElementById('modelBValue').textContent = Number(b).toFixed(2);
+    const modelAEl = getElement('modelA');
+    const modelBEl = getElement('modelB');
+    if (!modelAEl || !modelBEl) return;
+    
+    const a = parseFloat(modelAEl.value);
+    const b = parseFloat(modelBEl.value);
+    
+    if (!isFinite(a) || !isFinite(b)) return;
+    
+    updateDisplay('modelAValue', a, 2);
+    updateDisplay('modelBValue', b, 2);
 
     renderDataPlot({
       svg,
@@ -690,16 +1221,8 @@ function initModelViz() {
     });
   }
 
-  document.getElementById('modelA').addEventListener('input', () => {
-    const val = parseFloat(document.getElementById('modelA').value);
-    document.getElementById('modelAValue').textContent = val.toFixed(2);
-    render();
-  });
-  document.getElementById('modelB').addEventListener('input', () => {
-    const val = parseFloat(document.getElementById('modelB').value);
-    document.getElementById('modelBValue').textContent = val.toFixed(2);
-    render();
-  });
+  bindSlider('modelA', 'modelAValue', { format: 2, onInput: render });
+  bindSlider('modelB', 'modelBValue', { format: 2, onInput: render });
   window.addEventListener('dataUpdated', render);
   render();
 }
@@ -766,7 +1289,7 @@ function initLandscapeViz() {
   const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
   const meshPoints = 25;
-  const aMin = 0.1, aMax = 0.7, bMin = 0.3, bMax = 0.9;
+  const { aMin, aMax, bMin, bMax } = PARAM_RANGES;
 
   function render() {
     if (currentDataPoints.length === 0) return;
@@ -804,7 +1327,7 @@ function initLandscapeViz() {
 
     // Title
     g.append('text').attr('x', w / 2).attr('y', -10).attr('text-anchor', 'middle')
-      .attr('fill', '#ffffff').attr('font-size', '14px').text('Error Landscape: MSE as a function of a and b');
+      .attr('fill', '#ffffff').attr('font-size', '15px').text('Error Landscape: MSE as a function of a and b');
 
     // Colorbar
     const colorbarW = 20, colorbarH = h;
@@ -836,7 +1359,7 @@ function initLandscapeViz() {
     axisG.call(d3.axisRight(colorScale2).tickValues(tickVals).tickFormat(d3.format('.2f')))
       .selectAll('text')
       .attr('fill', '#ffffff')
-      .attr('font-size', '12px')
+      .attr('font-size', '13px')
       .attr('font-weight', '500');
     axisG.selectAll('line').attr('stroke', '#ffffff').attr('opacity', 0.6);
     axisG.selectAll('path').attr('stroke', '#ffffff').attr('opacity', 0.6);
@@ -881,7 +1404,7 @@ function initSingleStepViz() {
   svgLandscape.attr('viewBox', `0 0 ${width} ${height}`);
   svgAfter.attr('viewBox', `0 0 ${width} ${height}`);
 
-  const aMin = 0.1, aMax = 0.7, bMin = 0.3, bMax = 0.9;
+  const { aMin, aMax, bMin, bMax } = PARAM_RANGES;
 
   function renderLandscape(a0, b0, a1, b1, alpha) {
     svgLandscape.selectAll('*').remove();
@@ -934,7 +1457,7 @@ function initSingleStepViz() {
       .attr('fill', '#00ff00').attr('stroke', '#fff').attr('stroke-width', 2);
 
     g.append('text').attr('x', w / 2).attr('y', -10).attr('text-anchor', 'middle')
-      .attr('fill', '#ffffff').attr('font-size', '12px').text('Gradient Step on Landscape');
+      .attr('fill', '#ffffff').attr('font-size', '15px').text('Gradient Step on Landscape');
     
     // Return computed values for consistency
     return { a1: finalA1, b1: finalB1 };
@@ -1019,7 +1542,7 @@ function initBatchLandscapesViz() {
   const w = width - margin.left - margin.right;
   const h = height - margin.top - margin.bottom;
 
-  const aMin = 0.1, aMax = 0.7, bMin = 0.3, bMax = 0.9;
+  const { aMin, aMax, bMin, bMax } = PARAM_RANGES;
 
   function renderBatchLandscape(svg, batchPoints, a0, b0, batchNum, batchIndices) {
     svg.selectAll('*').remove();
@@ -1108,7 +1631,7 @@ function initBatchLandscapesViz() {
     // Title with batch indices
     const idxText = batchIndices.join(', ');
     g.append('text').attr('x', w / 2).attr('y', -10).attr('text-anchor', 'middle')
-      .attr('fill', '#ffffff').attr('font-size', '12px')
+      .attr('fill', '#ffffff').attr('font-size', '15px')
       .text(`Batch ${batchNum}: J=[${idxText}]`);
   }
 
@@ -1118,6 +1641,13 @@ function initBatchLandscapesViz() {
 
   function render() {
     if (currentDataPoints.length === 0) return;
+    
+    // Guard: regenerate batches if any are empty (edge case after data change)
+    if (batch1Indices.length === 0 || batch2Indices.length === 0 || batch3Indices.length === 0) {
+      regenerateBatches();
+      return;
+    }
+    
     const a0 = parseFloat(document.getElementById('batchA0').value);
     const b0 = parseFloat(document.getElementById('batchB0').value);
     const batchSize = parseInt(document.getElementById('batchSizeViz').value, 10);
@@ -1200,7 +1730,7 @@ function initGDViz() {
   svg.attr('viewBox', `0 0 ${width} ${height}`);
   const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-  const aMin = 0.1, aMax = 0.7, bMin = 0.3, bMax = 0.9;
+  const { aMin, aMax, bMin, bMax } = PARAM_RANGES;
   
   // Helper to generate random starting position within valid ranges
   function randomStartPosition() {
@@ -1256,7 +1786,7 @@ function initGDViz() {
       }
       step();
       count++;
-    }, 50);
+    }, ANIMATION_INTERVAL);
   });
 
   document.getElementById('gdAlpha').addEventListener('input', () => {
@@ -1338,7 +1868,15 @@ function initSGDViz() {
   svg.attr('viewBox', `0 0 ${width} ${height}`);
   const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-  const aMin = 0.1, aMax = 0.7, bMin = 0.3, bMax = 0.9;
+  const { aMin, aMax, bMin, bMax } = PARAM_RANGES;
+
+  // Helper to generate random starting position within valid ranges
+  function randomStartPosition() {
+    return {
+      a: aMin + Math.random() * (aMax - aMin),
+      b: bMin + Math.random() * (bMax - bMin)
+    };
+  }
 
   function render() {
     if (currentDataPoints.length === 0) return;
@@ -1387,7 +1925,7 @@ function initSGDViz() {
       }
       step();
       count++;
-    }, 30);
+    }, ANIMATION_INTERVAL);
   });
   document.getElementById('sgdAlpha').addEventListener('input', () => {
     document.getElementById('sgdAlphaValue').textContent = parseFloat(document.getElementById('sgdAlpha').value).toFixed(3);
@@ -1417,8 +1955,15 @@ function initSGDViz() {
 
   document.getElementById('sgdResetBtn').addEventListener('click', () => {
     sgdRunning = false;
-    sgdCurrent.a = parseFloat(document.getElementById('sgdA0').value);
-    sgdCurrent.b = parseFloat(document.getElementById('sgdB0').value);
+    // Generate new random starting position
+    const startPos = randomStartPosition();
+    sgdCurrent.a = startPos.a;
+    sgdCurrent.b = startPos.b;
+    // Update sliders to match
+    document.getElementById('sgdA0').value = startPos.a;
+    document.getElementById('sgdB0').value = startPos.b;
+    document.getElementById('sgdA0Value').textContent = startPos.a.toFixed(2);
+    document.getElementById('sgdB0Value').textContent = startPos.b.toFixed(2);
     sgdTrajectory = [{ a: sgdCurrent.a, b: sgdCurrent.b }];
     sgdHistory = [];
     window.dispatchEvent(new Event('sgdUpdated'));
@@ -1452,12 +1997,29 @@ let asgdTrajectory = [];
 let asgdCurrent = { a: 0.25, b: 0.35 };
 let asgdRunning = false;
 
+// Plateau (ReduceLROnPlateau) state
+let plateauTrajectory = [];
+let plateauCurrent = { a: 0.4, b: 0.3 };
+let plateauRunning = false;
+let plateauHistory = [];
+
 // Reusable function to create learning curves visualization
-function createLearningCurvesViz(svgIds, historyGetter, eventName, algorithmName) {
+function createLearningCurvesViz(svgIds, historyGetter, eventName, algorithmName, logScaleCheckboxId) {
   const width = 360, height = 280;
   const margin = { top: 30, right: 20, bottom: 40, left: 50 };
   const w = width - margin.left - margin.right;
   const h = height - margin.top - margin.bottom;
+  
+  let useLogScale = false;
+  if (logScaleCheckboxId) {
+    const checkbox = document.getElementById(logScaleCheckboxId);
+    if (checkbox) {
+      checkbox.addEventListener('change', () => {
+        useLogScale = checkbox.checked;
+        renderCurves();
+      });
+    }
+  }
 
   const svgMSE = d3.select(svgIds.mse);
   const svgA = d3.select(svgIds.a);
@@ -1471,12 +2033,12 @@ function createLearningCurvesViz(svgIds, historyGetter, eventName, algorithmName
   const gA = svgA.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
   const gB = svgB.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-  function renderPlot(g, data, yAccessor, yLabel, title) {
+  function renderPlot(g, data, yAccessor, yLabel, title, yBounds = null, isLogScale = false) {
     g.selectAll('*').remove();
 
     if (!data || data.length === 0) {
       g.append('text').attr('x', w / 2).attr('y', h / 2)
-        .attr('text-anchor', 'middle').attr('fill', '#c9d4e5').attr('font-size', '12px')
+        .attr('text-anchor', 'middle').attr('fill', '#c9d4e5').attr('font-size', '13px')
         .text(`Run ${algorithmName} to see curves`);
       return;
     }
@@ -1484,10 +2046,27 @@ function createLearningCurvesViz(svgIds, historyGetter, eventName, algorithmName
     const maxLen = data.length;
     const xScale = d3.scaleLinear().domain([0, maxLen]).range([0, w]);
 
-    const allVals = data.map(yAccessor);
-    const yMin = d3.min(allVals) || 0;
-    const yMax = d3.max(allVals) || 1;
-    const yScale = d3.scaleLinear().domain([yMin, yMax]).range([h, 0]);
+    // Use fixed bounds if provided, otherwise compute from data
+    let yMin, yMax;
+    if (yBounds) {
+      yMin = yBounds.min;
+      yMax = yBounds.max;
+    } else {
+      const allVals = data.map(yAccessor);
+      yMin = d3.min(allVals) || 0;
+      yMax = d3.max(allVals) || 1;
+    }
+    
+    // Use log scale if requested and appropriate
+    let yScale;
+    if (isLogScale && yMin > 0) {
+      // Ensure log scale has positive domain
+      const logMin = yMin > 0 ? yMin : 0.0001;
+      const logMax = yMax > logMin ? yMax : logMin * 10;
+      yScale = d3.scaleLog().domain([logMin, logMax]).range([h, 0]);
+    } else {
+      yScale = d3.scaleLinear().domain([yMin, yMax]).range([h, 0]);
+    }
 
     g.append('g').attr('class', 'grid').attr('transform', `translate(0,${h})`)
       .call(d3.axisBottom(xScale).ticks(5).tickSize(-h).tickFormat(''));
@@ -1496,20 +2075,37 @@ function createLearningCurvesViz(svgIds, historyGetter, eventName, algorithmName
 
     g.append('g').attr('class', 'axis').attr('transform', `translate(0,${h})`)
       .call(d3.axisBottom(xScale).ticks(5));
-    g.append('g').attr('class', 'axis').call(d3.axisLeft(yScale).ticks(5));
+    
+    // For log scale, use appropriate tick formatting
+    if (isLogScale && yMin > 0) {
+      // For log scales, let D3 choose appropriate ticks and use a custom format
+      g.append('g').attr('class', 'axis')
+        .call(d3.axisLeft(yScale)
+          .ticks(5)
+          .tickFormat(d => d >= 1 ? d3.format('.2f')(d) : d3.format('.3f')(d)));
+    } else {
+      g.append('g').attr('class', 'axis').call(d3.axisLeft(yScale).ticks(5));
+    }
     g.append('text').attr('x', w / 2).attr('y', h + 35).attr('text-anchor', 'middle')
-      .attr('fill', '#c9d4e5').attr('font-size', '11px').text('Iteration');
+      .attr('fill', '#c9d4e5').attr('font-size', '13px').text('Iteration');
     g.append('text').attr('x', -h / 2).attr('y', -35).attr('text-anchor', 'middle')
-      .attr('fill', '#c9d4e5').attr('font-size', '11px')
+      .attr('fill', '#c9d4e5').attr('font-size', '13px')
       .attr('transform', `rotate(-90, -${h / 2}, -35)`).text(yLabel);
     g.append('text').attr('x', w / 2).attr('y', -10).attr('text-anchor', 'middle')
-      .attr('fill', '#ffffff').attr('font-size', '13px').text(title);
+      .attr('fill', '#ffffff').attr('font-size', '15px').text(title);
 
     const lineGen = d3.line()
       .x((d, i) => xScale(i))
       .y(d => yScale(yAccessor(d)));
 
-    const color = algorithmName === 'GD' ? '#ff00ff' : algorithmName === 'SGD' ? '#00aaff' : '#ffaa00';
+    // Use colors from COLORS constant for consistency
+    const colorMap = {
+      'GD': COLORS.trajectory,
+      'SGD': COLORS.sgd,
+      'ASGD': COLORS.asgd,
+      'Plateau': COLORS.plateau
+    };
+    const color = colorMap[algorithmName] || COLORS.trajectory;
     
     g.append('path')
       .datum(data)
@@ -1521,15 +2117,23 @@ function createLearningCurvesViz(svgIds, historyGetter, eventName, algorithmName
     // Legend
     g.append('line').attr('x1', 10).attr('x2', 35).attr('y1', 5).attr('y2', 5)
       .attr('stroke', color).attr('stroke-width', 2);
-    g.append('text').attr('x', 40).attr('y', 9).attr('fill', '#c9d4e5').attr('font-size', '10px')
+    g.append('text').attr('x', 40).attr('y', 9).attr('fill', '#c9d4e5').attr('font-size', '12px')
       .text(algorithmName);
   }
 
   function renderCurves() {
     const historyData = historyGetter();
-    renderPlot(gMSE, historyData, d => d.mse, 'MSE', 'Mean Squared Error');
-    renderPlot(gA, historyData, d => d.a, 'a', 'Parameter a (slope)');
-    renderPlot(gB, historyData, d => d.b, 'b', 'Parameter b (intercept)');
+    
+    // MSE: fixed min at 0, max from data, with optional log scale
+    const mseMax = historyData.length > 0 ? d3.max(historyData, d => d.mse) || 1 : 1;
+    const mseMin = useLogScale ? (d3.min(historyData, d => d.mse) || 0.0001) : 0;
+    renderPlot(gMSE, historyData, d => d.mse, 'MSE', 'Mean Squared Error', { min: mseMin, max: mseMax }, useLogScale);
+    
+    // Parameter a: fixed bounds from PARAM_RANGES
+    renderPlot(gA, historyData, d => d.a, 'a', 'Parameter a (slope)', { min: PARAM_RANGES.aMin, max: PARAM_RANGES.aMax }, false);
+    
+    // Parameter b: fixed bounds from PARAM_RANGES
+    renderPlot(gB, historyData, d => d.b, 'b', 'Parameter b (intercept)', { min: PARAM_RANGES.bMin, max: PARAM_RANGES.bMax }, false);
   }
 
   window.addEventListener(eventName, renderCurves);
@@ -1541,7 +2145,8 @@ function initGDCurvesViz() {
     { mse: '#viz-curves-gd-mse', a: '#viz-curves-gd-a', b: '#viz-curves-gd-b' },
     () => gdHistory,
     'gdUpdated',
-    'GD'
+    'GD',
+    'gdMseLogScale'
   );
 }
 
@@ -1550,7 +2155,8 @@ function initSGDCurvesViz() {
     { mse: '#viz-curves-sgd-mse', a: '#viz-curves-sgd-a', b: '#viz-curves-sgd-b' },
     () => sgdHistory,
     'sgdUpdated',
-    'SGD'
+    'SGD',
+    'sgdMseLogScale'
   );
 }
 
@@ -1559,7 +2165,18 @@ function initASGDCurvesViz() {
     { mse: '#viz-curves-asgd-mse', a: '#viz-curves-asgd-a', b: '#viz-curves-asgd-b' },
     () => asgdHistory,
     'asgdUpdated',
-    'ASGD'
+    'ASGD',
+    'asgdMseLogScale'
+  );
+}
+
+function initPlateauCurvesViz() {
+  createLearningCurvesViz(
+    { mse: '#viz-curves-plateau-mse', a: '#viz-curves-plateau-a', b: '#viz-curves-plateau-b' },
+    () => plateauHistory,
+    'plateauUpdated',
+    'Plateau',
+    'plateauMseLogScale'
   );
 }
 
@@ -1701,19 +2318,31 @@ function initComplexLossViz() {
     // Add contour lines
     drawContourLines(g, losses, p1Arr, p2Arr, p1Scale, p2Scale, minLoss, maxLoss, 10);
 
-    // Grid
-    g.append('g').attr('class', 'grid').attr('transform', `translate(0,${h})`)
-      .call(d3.axisBottom(p1Scale).ticks(10).tickSize(-h).tickFormat(''));
-    g.append('g').attr('class', 'grid')
-      .call(d3.axisLeft(p2Scale).ticks(10).tickSize(-w).tickFormat(''));
-
-    // Axes
-    g.append('g').attr('class', 'axis').attr('transform', `translate(0,${h})`)
-      .call(d3.axisBottom(p1Scale).ticks(6));
+    // Grid - show gridlines at 0.5 intervals (but only a subset for clarity)
+    // For p1 (x-axis): -5 to 7, show every integer and half-integer
+    const p1GridTicks = [];
+    for (let i = -5; i <= 7; i += 0.5) {
+      p1GridTicks.push(i);
+    }
     
-    // Set y-ticks as in notebook: range(-6,4,2) -> [-6, -4, -2, 0, 2]
-    const yTicks = [-6, -4, -2, 0, 2];
-    g.append('g').attr('class', 'axis').call(d3.axisLeft(p2Scale).tickValues(yTicks));
+    // For p2 (y-axis): -7 to 2, show every integer and half-integer
+    const p2GridTicks = [];
+    for (let i = -7; i <= 2; i += 0.5) {
+      p2GridTicks.push(i);
+    }
+    
+    g.append('g').attr('class', 'grid').attr('transform', `translate(0,${h})`)
+      .call(d3.axisBottom(p1Scale).tickValues(p1GridTicks).tickSize(-h).tickFormat(''));
+    g.append('g').attr('class', 'grid')
+      .call(d3.axisLeft(p2Scale).tickValues(p2GridTicks).tickSize(-w).tickFormat(''));
+
+    // Axes - show labels only at integer values for clarity
+    const p1AxisTicks = [-4, -2, 0, 2, 4, 6];
+    const p2AxisTicks = [-6, -4, -2, 0, 2];
+    
+    g.append('g').attr('class', 'axis').attr('transform', `translate(0,${h})`)
+      .call(d3.axisBottom(p1Scale).tickValues(p1AxisTicks));
+    g.append('g').attr('class', 'axis').call(d3.axisLeft(p2Scale).tickValues(p2AxisTicks));
 
     g.append('text').attr('x', w / 2).attr('y', h + 40).attr('text-anchor', 'middle')
       .attr('fill', '#c9d4e5').text('p1');
@@ -1722,7 +2351,7 @@ function initComplexLossViz() {
 
     // Title
     g.append('text').attr('x', w / 2).attr('y', -10).attr('text-anchor', 'middle')
-      .attr('fill', '#ffffff').attr('font-size', '14px').text('Loss Landscape');
+      .attr('fill', '#ffffff').attr('font-size', '15px').text('Loss Landscape');
 
     // Colorbar
     const colorbarW = 20, colorbarH = h;
@@ -1758,7 +2387,7 @@ function initGradientEvalViz() {
   svg.attr('viewBox', `0 0 ${width} ${height}`);
   const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-  const aMin = 0.1, aMax = 0.7, bMin = 0.3, bMax = 0.9;
+  const { aMin, aMax, bMin, bMax } = PARAM_RANGES;
 
   function render() {
     if (currentDataPoints.length === 0) return;
@@ -1832,31 +2461,22 @@ function init() {
   initModelMinimizationViz();
   
   // Defer heavy computations to allow page to render
+  // Use single deferred call instead of multiple setTimeout chains
   setTimeout(() => {
     initLandscapeViz();
     initGradientEvalViz();
-  }, 10);
-  
-  setTimeout(() => {
     initSingleStepViz();
     initBatchLandscapesViz();
-  }, 50);
-  
-  setTimeout(() => {
     initGDViz();
     initSGDViz();
     initAnnealedSGDViz();
-  }, 100);
-  
-  setTimeout(() => {
+    initPlateauSGDViz();
     initGDCurvesViz();
     initSGDCurvesViz();
     initASGDCurvesViz();
-  }, 150);
-  
-  setTimeout(() => {
+    initPlateauCurvesViz();
     initComplexLossViz();
-  }, 200);
+  }, 50);
 }
 
 if (document.readyState === 'loading') {

@@ -7,8 +7,8 @@
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
-  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <script>window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']] } };</script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <script defer src="main.js"></script>
   <meta name="description" content="Interactive SGD tutorial: Data, Model, Loss, and Optimizer.">
 </head>
@@ -36,17 +36,17 @@
 
     <div class="section">
       <h2>The Data</h2>
-      <p>We generate N data points sampled near the line $y = 0.3x + 0.5$ + Gaussian noise.</p>
+      <p>We generate N data points sampled near the line $y = 0.3x + 0.3$ + Gaussian noise.</p>
       <div class="controls">
         <label class="control">
           <span>Number of points: <strong id="dataPointsValue">5</strong></span>
-          <input id="dataPoints" type="range" min="1" max="10" step="1" value="7">
+          <input id="dataPoints" type="range" min="1" max="10" step="1" value="7" aria-label="Number of data points">
         </label>
         <label class="control">
-          <span>Noise σ: <strong id="noiseSigmaValue">0.8</strong></span>
-          <input id="noiseSigma" type="range" min="0" max="1.2" step="0.1" value="0.8">
+          <span>Noise σ: <strong id="noiseSigmaValue">0.6</strong></span>
+          <input id="noiseSigma" type="range" min="0" max="1.1" step="0.1" value="0.6" aria-label="Noise standard deviation">
         </label>
-        <button id="sampleDataBtn" type="button">Sample Data</button>
+        <button id="sampleDataBtn" type="button" aria-label="Generate new data sample">Sample Data</button>
       </div>
       <div class="viz">
         <svg id="viz-data" width="760" height="400"></svg>
@@ -63,11 +63,11 @@
       <div class="controls">
         <label class="control">
           <span>a (slope): <strong id="modelAValue">0.4</strong></span>
-          <input id="modelA" type="range" min="-1.5" max="2.0" step="0.01" value="-0.1">
+          <input id="modelA" type="range" min="-1.5" max="2.0" step="0.01" value="-0.1" aria-label="Model slope parameter">
         </label>
         <label class="control">
           <span>b (intercept): <strong id="modelBValue">0.6</strong></span>
-          <input id="modelB" type="range" min="-1.0" max="1.5" step="0.01" value="1.0">
+          <input id="modelB" type="range" min="-1.0" max="1.5" step="0.01" value="1.0" aria-label="Model intercept parameter">
         </label>
       </div>
 
@@ -229,8 +229,8 @@
           <input id="gradEvalA" type="range" min="0.1" max="0.7" step="0.01" value="0.5">
         </label>
         <label class="control">
-          <span>b: <strong id="gradEvalBValue">0.4</strong></span>
-          <input id="gradEvalB" type="range" min="0.3" max="0.9" step="0.01" value="0.6">
+          <span>b: <strong id="gradEvalBValue">0.5</strong></span>
+          <input id="gradEvalB" type="range" min="0.0" max="0.6" step="0.01" value="0.5">
         </label>
       </div>
       <div class="viz">
@@ -291,8 +291,8 @@
           <input id="stepA0" type="range" min="0.1" max="0.7" step="0.01" value="0.60">
         </label>
         <label class="control">
-          <span>Initial b: <strong id="stepB0Value">0.85</strong></span>
-          <input id="stepB0" type="range" min="0.3" max="0.9" step="0.01" value="0.85">
+          <span>Initial b: <strong id="stepB0Value">0.5</strong></span>
+          <input id="stepB0" type="range" min="0.0" max="0.6" step="0.01" value="0.5">
         </label>
         <label class="control">
           <span>Learning rate α: <strong id="stepAlphaValue">0.08</strong></span>
@@ -333,17 +333,17 @@
           <input id="gdA0" type="range" min="0.1" max="0.7" step="0.01" value="0.5">
         </label>
         <label class="control">
-          <span>Initial b: <strong id="gdB0Value">0.5</strong></span>
-          <input id="gdB0" type="range" min="0.3" max="0.9" step="0.01" value="0.5">
+          <span>Initial b: <strong id="gdB0Value">0.3</strong></span>
+          <input id="gdB0" type="range" min="0.0" max="0.6" step="0.01" value="0.3">
         </label>
         <label class="control">
           <span>Iterations: <strong id="gdIterValue">100</strong></span>
           <input id="gdIterations" type="range" min="1" max="500" step="1" value="100">
         </label>
         <div class="control buttons">
-          <button id="gdStepBtn" type="button">Single Step</button>
-          <button id="gdRunBtn" type="button">Run Gradient Descent</button>
-          <button id="gdResetBtn" type="button">Reset</button>
+          <button id="gdStepBtn" type="button" aria-label="Perform single gradient descent step">Single Step</button>
+          <button id="gdRunBtn" type="button" aria-label="Run gradient descent algorithm">Run Gradient Descent</button>
+          <button id="gdResetBtn" type="button" aria-label="Reset gradient descent">Reset</button>
         </div>
       </div>
       <div class="viz">
@@ -359,6 +359,12 @@
     <div class="section">
       <h2>Learning Curves</h2>
       <p>The learning curve shows how the MSE decreases. Additionally the evolution of the model parameters a and b during training is shown:</p>
+      <div style="margin-bottom: 12px;">
+        <label style="color: #c9d4e5; font-size: 14px; cursor: pointer;">
+          <input type="checkbox" id="gdMseLogScale" style="margin-right: 6px;">
+          Use log scale for MSE plot
+        </label>
+      </div>
       <div class="curves-grid">
         <div class="viz">
           <svg id="viz-curves-gd-mse" width="360" height="280"></svg>
@@ -372,17 +378,18 @@
       </div>
     </div>
 
-    <div class="section">
+    <div class="section exercise">
       <h2>Exercise</h2>
       <ul>
         <li>Try different learning rates (e.g., 0.001, 0.1, 0.2).</li>
         <li>Try different numbers of iterations and initial values $(a_0,b_0)$.</li>
         <li>Discuss possible stopping criteria.</li>
+        <li>The parameters a and b do not converge to their final values at the same speed. Explain why.</li>
       </ul>
     </div>
 
     <div class="section exercise">
-      <h3>Exercise</h3>
+      <h3>A more complex loss landscape</h3>
       <p>Look at the loss function plotted below. It is a constructed example. Imagine the figure showed the error-landscape of a two-parameter-model fitted to some data.</p>
       <ul>
         <li>What problem do you identify, when applying Gradient Descent?</li>
@@ -398,6 +405,7 @@
         <ul>
           <li><strong>Gradient Descent stops at a local minimum.</strong> There's no guarantee to find a/the <strong>global minimum</strong>.</li>
           <li>A possible solution is to run the algorithm multiple times from different initial values.</li>
+          <li>The function has a saddle point. There, the gradient is very small and it can take many iterations to move away from that region.</li>
       </ul>
         </details>
 
@@ -469,17 +477,17 @@
           <input id="sgdA0" type="range" min="0.1" max="0.7" step="0.01" value="0.15">
         </label>
         <label class="control">
-          <span>Initial b: <strong id="sgdB0Value">0.8</strong></span>
-          <input id="sgdB0" type="range" min="0.3" max="0.9" step="0.01" value="0.8">
+          <span>Initial b: <strong id="sgdB0Value">0.5</strong></span>
+          <input id="sgdB0" type="range" min="0.0" max="0.6" step="0.01" value="0.5">
         </label>
         <label class="control">
           <span>Iterations: <strong id="sgdIterValue">5</strong></span>
           <input id="sgdIterations" type="range" min="1" max="200" step="1" value="5">
         </label>
         <div class="control buttons">
-          <button id="sgdStepBtn" type="button">Single Step</button>
-          <button id="sgdRunBtn" type="button">Run SGD</button>
-          <button id="sgdResetBtn" type="button">Reset</button>
+          <button id="sgdStepBtn" type="button" aria-label="Perform single stochastic gradient descent step">Single Step</button>
+          <button id="sgdRunBtn" type="button" aria-label="Run stochastic gradient descent algorithm">Run SGD</button>
+          <button id="sgdResetBtn" type="button" aria-label="Reset stochastic gradient descent">Reset</button>
         </div>
       </div>
       <div class="viz">
@@ -494,6 +502,12 @@
 
     <div class="section">
       <h2>Learning Curve for SGD</h2>
+      <div style="margin-bottom: 12px;">
+        <label style="color: #c9d4e5; font-size: 14px; cursor: pointer;">
+          <input type="checkbox" id="sgdMseLogScale" style="margin-right: 6px;">
+          Use log scale for MSE plot
+        </label>
+      </div>
       <div class="curves-grid">
         <div class="viz">
           <svg id="viz-curves-sgd-mse" width="360" height="280"></svg>
@@ -517,7 +531,7 @@
       </ul>
       <details class="hint-dropdown">
         <summary>💡 Hint</summary>
-        <p>Try to change the hyperparameters during training.</p>
+        <p>Try to change the hyperparameters and press the "Run" button again. Observe the learning curves.</p>
          </details>
 
     </div>
@@ -539,14 +553,14 @@
           <input id="batchA0" type="range" min="0.1" max="0.7" step="0.01" value="0.45">
         </label>
         <label class="control">
-          <span>Starting b: <strong id="batchB0Value">0.50</strong></span>
-          <input id="batchB0" type="range" min="0.3" max="0.9" step="0.01" value="0.50">
+          <span>Starting b: <strong id="batchB0Value">0.3</strong></span>
+          <input id="batchB0" type="range" min="0.0" max="0.6" step="0.01" value="0.3">
         </label>
         <label class="control">
           <span>Batch size: <strong id="batchSizeValue">3</strong></span>
           <input id="batchSizeViz" type="range" min="1" max="5" step="1" value="3">
         </label>
-        <button id="batchUpdateBtn" type="button">Sample new Batches</button>
+        <button id="batchUpdateBtn" type="button" aria-label="Generate new random batches">Sample new Batches</button>
       </div>
       <div class="batch-grid">
         <div class="viz">
@@ -591,8 +605,8 @@
           <input id="asgdAlpha0" type="range" min="0.001" max="0.2" step="0.001" value="0.05">
         </label>
         <label class="control">
-          <span>Annealing factor: <strong id="asgdAnnealValue">0.990</strong></span>
-          <input id="asgdAnneal" type="range" min="0.90" max="1.00" step="0.001" value="0.99">
+          <span>Annealing factor: <strong id="asgdAnnealValue">0.970</strong></span>
+          <input id="asgdAnneal" type="range" min="0.90" max="1.00" step="0.001" value="0.97">
         </label>
         <label class="control">
           <span>Lower bound: <strong id="asgdLowerValue">0.0010</strong></span>
@@ -603,25 +617,30 @@
           <input id="asgdBatch" type="range" min="1" max="10" step="1" value="3">
         </label>
         <label class="control">
-          <span>Initial a: <strong id="asgdA0Value">0.25</strong></span>
-          <input id="asgdA0" type="range" min="0.1" max="0.7" step="0.01" value="0.25">
+          <span>Initial a: <strong id="asgdA0Value">0.5</strong></span>
+          <input id="asgdA0" type="range" min="0.1" max="0.7" step="0.01" value="0.5">
         </label>
         <label class="control">
-          <span>Initial b: <strong id="asgdB0Value">0.35</strong></span>
-          <input id="asgdB0" type="range" min="0.3" max="0.9" step="0.01" value="0.5">
+          <span>Initial b: <strong id="asgdB0Value">0.5</strong></span>
+          <input id="asgdB0" type="range" min="0.0" max="0.6" step="0.01" value="0.5">
         </label>
         <label class="control">
-          <span>Iterations: <strong id="asgdIterValue">500</strong></span>
-          <input id="asgdIterations" type="range" min="1" max="2000" step="1" value="500">
+          <span>Iterations: <strong id="asgdIterValue">150</strong></span>
+          <input id="asgdIterations" type="range" min="1" max="200" step="1" value="150">
         </label>
         <div class="control buttons">
-          <button id="asgdStepBtn" type="button">Single Step</button>
-          <button id="asgdRunBtn" type="button">Run ASGD</button>
-          <button id="asgdResetBtn" type="button">Reset</button>
+          <button id="asgdStepBtn" type="button" aria-label="Perform single annealed stochastic gradient descent step">Single Step</button>
+          <button id="asgdRunBtn" type="button" aria-label="Run annealed stochastic gradient descent algorithm">Run ASGD</button>
+          <button id="asgdResetBtn" type="button" aria-label="Reset annealed stochastic gradient descent">Reset</button>
         </div>
       </div>
-      <div class="viz">
-        <svg id="viz-asgd" width="760" height="520"></svg>
+      <div class="viz-grid">
+        <div class="viz">
+          <svg id="viz-asgd" width="600" height="400"></svg>
+        </div>
+        <div class="viz">
+          <svg id="viz-asgd-alpha" width="340" height="400"></svg>
+        </div>
       </div>
       <div class="metrics">
         <span>Current MSE: <strong id="asgdMseValue">0.000</strong></span>
@@ -629,14 +648,17 @@
         <span>Current b: <strong id="asgdCurrentB">0.350</strong></span>
         <span>Current α: <strong id="asgdAlphaNow">0.0500</strong></span>
       </div>
-      <div class="viz">
-        <svg id="viz-asgd-alpha" width="360" height="220"></svg>
-      </div>
     </div>
 
     <div class="section">
       <h2>Learning Curves</h2>
       <p>The learning curves show how the MSE and parameter values evolve during Annealed Stochastic Gradient Descent training:</p>
+      <div style="margin-bottom: 12px;">
+        <label style="color: #c9d4e5; font-size: 14px; cursor: pointer;">
+          <input type="checkbox" id="asgdMseLogScale" style="margin-right: 6px;">
+          Use log scale for MSE plot
+        </label>
+      </div>
       <div class="curves-grid">
         <div class="viz">
           <svg id="viz-curves-asgd-mse" width="360" height="280"></svg>
@@ -661,10 +683,117 @@
     </div>
 
     <div class="section">
+      <h2>Stochastic Gradient Descent with Reduce on Plateau</h2>
+      <p>
+        Another approach to adapting the learning rate is to reduce it only when necessary, rather than at every step. 
+        The <strong>Reduce on Plateau</strong> scheduler monitors the MSE and reduces the learning rate when the loss stops improving.
+        (Other variants monitor a metric of the validation set. We do not further discuss them here.)
+        <br>
+        This is more adaptive than annealing because:
+      </p>
+      <ul>
+        <li><strong>Annealing</strong> reduces $\alpha$ at every iteration, regardless of whether progress is being made.</li>
+        <li><strong>Plateau detection</strong> only reduces $\alpha$ when the MSE plateaus (shows no improvement for a certain number of steps).</li>
+      </ul>
+      <p>
+        The algorithm tracks the best MSE seen so far and counts steps without improvement. When this count reaches the <strong>patience</strong> parameter, 
+        the learning rate is multiplied by a <strong>factor</strong> (typically 0.5), but not below a <strong>lower bound</strong>:
+        $$\text{if no improvement for patience steps: } \alpha \leftarrow \max(\alpha \times \text{factor}, \text{lower bound})$$
+      </p>
+      <div class="controls">
+        <label class="control">
+          <span>Initial α: <strong id="plateauAlpha0Value">0.10</strong></span>
+          <input id="plateauAlpha0" type="range" min="0.001" max="0.2" step="0.001" value="0.10" aria-label="Initial learning rate for Plateau SGD">
+        </label>
+        <label class="control">
+          <span>Reduction factor: <strong id="plateauFactorValue">0.80</strong></span>
+          <input id="plateauFactor" type="range" min="0.0" max="1.0" step="0.02" value="0.8" aria-label="Learning rate reduction factor">
+        </label>
+        <label class="control">
+          <span>Lower bound: <strong id="plateauLowerValue">0.0010</strong></span>
+          <input id="plateauLower" type="range" min="0.0001" max="0.05" step="0.0001" value="0.001" aria-label="Lower bound for learning rate">
+        </label>
+        <label class="control">
+          <span>Patience (steps): <strong id="plateauPatienceValue">10</strong></span>
+          <input id="plateauPatience" type="range" min="0" max="50" step="2" value="10" aria-label="Number of steps without improvement before reducing learning rate">
+        </label>
+        <label class="control">
+          <span>Batch size n: <strong id="plateauBatchValue">3</strong></span>
+          <input id="plateauBatch" type="range" min="1" max="10" step="1" value="3" aria-label="Batch size for plateau SGD">
+        </label>
+        <label class="control">
+          <span>Initial a: <strong id="plateauA0Value">0.50</strong></span>
+          <input id="plateauA0" type="range" min="0.1" max="0.7" step="0.01" value="0.5" aria-label="Initial parameter a for plateau SGD">
+        </label>
+        <label class="control">
+          <span>Initial b: <strong id="plateauB0Value">0.30</strong></span>
+          <input id="plateauB0" type="range" min="0.0" max="0.6" step="0.01" value="0.3" aria-label="Initial parameter b for plateau SGD">
+        </label>
+        <label class="control">
+          <span>Iterations: <strong id="plateauIterValue">200</strong></span>
+          <input id="plateauIterations" type="range" min="1" max="500" step="1" value="200" aria-label="Number of iterations for plateau SGD">
+        </label>
+        <div class="control buttons">
+          <button id="plateauStepBtn" type="button" aria-label="Perform single plateau SGD step">Single Step</button>
+          <button id="plateauRunBtn" type="button" aria-label="Run plateau SGD algorithm">Run Plateau SGD</button>
+          <button id="plateauResetBtn" type="button" aria-label="Reset plateau SGD">Reset</button>
+        </div>
+      </div>
+      <div class="viz-grid">
+        <div class="viz">
+          <svg id="viz-plateau" width="600" height="400"></svg>
+        </div>
+        <div class="viz">
+          <svg id="viz-plateau-alpha" width="340" height="400"></svg>
+        </div>
+      </div>
+      <div class="metrics">
+        <span>Current MSE: <strong id="plateauMseValue">0.000</strong></span>
+        <span>Current a: <strong id="plateauCurrentA">0.400</strong></span>
+        <span>Current b: <strong id="plateauCurrentB">0.300</strong></span>
+        <span>Current α: <strong id="plateauAlphaNow">0.0500</strong></span>
+        <span>Steps since improvement: <strong id="plateauStepsValue">0</strong></span>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Learning Curves</h2>
+      <p>The learning curves show how the MSE and parameter values evolve during Plateau SGD training:</p>
+      <div style="margin-bottom: 12px;">
+        <label style="color: #c9d4e5; font-size: 14px; cursor: pointer;">
+          <input type="checkbox" id="plateauMseLogScale" style="margin-right: 6px;">
+          Use log scale for MSE plot
+        </label>
+      </div>
+      <div class="curves-grid">
+        <div class="viz">
+          <svg id="viz-curves-plateau-mse" width="360" height="280"></svg>
+        </div>
+        <div class="viz">
+          <svg id="viz-curves-plateau-a" width="360" height="280"></svg>
+        </div>
+        <div class="viz">
+          <svg id="viz-curves-plateau-b" width="360" height="280"></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Exercise</h2>
+      <ul>
+        <li>Compare the convergence behavior with Annealed SGD. Which converges faster? Which is more stable?</li>
+        <li>Try different patience values (1, 5, 50). How does patience affect the algorithm's behavior?</li>
+        <li>Experiment with different reduction factors (0.5 vs 0.9). What is the trade-off?</li>
+        <li>Why is Reduce on Plateau considered more adaptive than annealing?</li>
+        <li>What happens if the patience is too small? Too large?</li>
+      </ul>
+    </div>
+
+    <div class="section">
       <div class="callout-box important" style="text-align: center; padding: 24px;">
         <h2 style="margin-top: 0;">Congratulations!</h2>
         <p style="font-size: 1.1em; margin-bottom: 0;">that's it!</p>
-        <p style="font-size: 1.1em;">You have just learned <strong>Gradient Descent</strong>, <strong>Stochastic Gradient Descent</strong>, <strong>Batch Gradient Descent</strong> and <strong>Annealed Stochastic Gradient Descent</strong></p>
+        <p style="font-size: 1.1em;">You have just learned <strong>Gradient Descent</strong>, <strong>Stochastic Gradient Descent</strong>, <strong>Batch Gradient Descent</strong>, <strong>Annealed Stochastic Gradient Descent</strong>, and <strong>Reduce on Plateau</strong></p>
       </div>
     </div>
 
