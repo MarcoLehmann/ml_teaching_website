@@ -44,6 +44,50 @@ const sampleXMin = -4;
 const sampleXMax = 4;
 const yDomain = [-4, 4];
 
+// Parameter ranges (used across multiple visualizations)
+const PARAM_RANGES = {
+  aMin: 0.1,
+  aMax: 0.7,
+  bMin: 0.3,
+  bMax: 0.9
+};
+
+// Visualization dimensions and margins
+const VIZ_DIMENSIONS = {
+  // Standard plot dimensions
+  standard: { width: 760, height: 520, margin: { top: 30, right: 80, bottom: 50, left: 60 } },
+  // Data plot dimensions
+  data: { width: 760, height: 400, margin: { top: 20, right: 20, bottom: 40, left: 50 } },
+  // Model plot dimensions
+  model: { width: 760, height: 520, margin: { top: 24, right: 24, bottom: 44, left: 56 } },
+  // Landscape plot dimensions
+  landscape: { width: 840, height: 520, margin: { top: 30, right: 100, bottom: 50, left: 60 } },
+  // Small plot dimensions (grid layouts)
+  small: { width: 360, height: 320, margin: { top: 30, right: 20, bottom: 40, left: 50 } },
+  // Learning curve dimensions
+  curve: { width: 360, height: 280, margin: { top: 30, right: 20, bottom: 40, left: 50 } },
+  // Alpha plot dimensions
+  alpha: { width: 360, height: 220, margin: { top: 24, right: 20, bottom: 36, left: 48 } }
+};
+
+// Colors
+const COLORS = {
+  text: '#ffffff',
+  textMuted: '#c9d4e5',
+  trajectory: '#ff00ff',
+  trajectoryPoint: '#ffffff',
+  gradient: '#ffff00',
+  sgd: '#00aaff',
+  asgd: '#ffaa00',
+  modelLine: '#3a89ff',
+  truthLine: '#2ecc71',
+  residual: '#ff4d4d',
+  point: '#2ecc71'
+};
+
+// Animation timing (single value for all animations)
+const ANIMATION_INTERVAL = 50;
+
 // Data state
 let noiseStdDev = 0.5;
 let currentDataPoints = [];
@@ -52,6 +96,82 @@ let randNorm = d3.randomNormal.source(d3.randomLcg(Math.random()))(0, noiseStdDe
 // ============================================================================
 // GLOBAL UTILITIES
 // ============================================================================
+
+/**
+ * Safely retrieves a DOM element by ID, with error handling.
+ * @param {string} id - Element ID
+ * @returns {HTMLElement|null} The element or null if not found
+ */
+function getElement(id) {
+  const element = document.getElementById(id);
+  if (!element) {
+    console.warn(`Element with id "${id}" not found`);
+  }
+  return element;
+}
+
+/**
+ * Updates a display element with a formatted value.
+ * @param {string} id - Element ID to update
+ * @param {number|string} value - Value to display
+ * @param {string|Function} format - Format function or format string ('fixed', 'int', 'float')
+ */
+function updateDisplay(id, value, format = 'fixed') {
+  const element = getElement(id);
+  if (!element) return;
+  
+  let formatted;
+  if (typeof format === 'function') {
+    formatted = format(value);
+  } else if (format === 'int') {
+    formatted = String(parseInt(value, 10));
+  } else if (format === 'float') {
+    formatted = parseFloat(value).toString();
+  } else if (typeof format === 'number') {
+    formatted = parseFloat(value).toFixed(format);
+  } else {
+    formatted = parseFloat(value).toFixed(2);
+  }
+  
+  element.textContent = formatted;
+}
+
+/**
+ * Binds a slider to update its display value and optionally call a callback.
+ * @param {string} sliderId - Slider input element ID
+ * @param {string} displayId - Display element ID (optional)
+ * @param {Object} options - Configuration options
+ * @param {string|number|Function} options.format - Format for display ('fixed', number of decimals, or function)
+ * @param {Function} options.onChange - Optional callback function(value)
+ * @param {Function} options.onInput - Optional callback for input event (different from onChange)
+ */
+function bindSlider(sliderId, displayId = null, options = {}) {
+  const slider = getElement(sliderId);
+  if (!slider) return;
+  
+  const { format = 'fixed', onChange = null, onInput = null } = options;
+  
+  slider.addEventListener('input', () => {
+    const value = parseFloat(slider.value);
+    
+    // Update display if provided
+    if (displayId) {
+      updateDisplay(displayId, value, format);
+    }
+    
+    // Call onInput callback if provided
+    if (onInput) {
+      onInput(value);
+    }
+  });
+  
+  // Call onChange callback if provided (for change event, not input)
+  if (onChange) {
+    slider.addEventListener('change', () => {
+      onChange(parseFloat(slider.value));
+    });
+  }
+}
 
 /**
  * Computes the Mean Squared Error (MSE) for a linear model.
@@ -63,13 +183,17 @@ let randNorm = d3.randomNormal.source(d3.randomLcg(Math.random()))(0, noiseStdDe
  * @returns {number} The computed MSE
  */
 function computeMSE(points, a, b) {
-  if (points.length === 0) return 0;
+  if (!points || points.length === 0) return 0;
+  if (!isFinite(a) || !isFinite(b)) return Infinity;
+  
   let sum = 0;
   for (const d of points) {
+    if (!isFinite(d.x) || !isFinite(d.y)) continue;
     const err = d.y - (a * d.x + b);
     sum += err * err;
   }
-  return sum / (2 * points.length);
+  const result = sum / (2 * points.length);
+  return isFinite(result) ? result : Infinity;
 }
 
 /**
@@ -272,14 +396,22 @@ function renderDataPlot(config) {
  * @returns {{da: number, db: number}} Gradient components
  */
 function computeGradient(points, a, b) {
-  if (points.length === 0) return { da: 0, db: 0 };
+  if (!points || points.length === 0) return { da: 0, db: 0 };
+  if (!isFinite(a) || !isFinite(b)) return { da: 0, db: 0 };
+  
   let sumDa = 0, sumDb = 0;
   for (const d of points) {
+    if (!isFinite(d.x) || !isFinite(d.y)) continue;
     const err = d.y - (a * d.x + b);
     sumDa += err * (-d.x);
     sumDb += err * (-1);
   }
-  return { da: sumDa / points.length, db: sumDb / points.length };
+  const da = sumDa / points.length;
+  const db = sumDb / points.length;
+  return { 
+    da: isFinite(da) ? da : 0, 
+    db: isFinite(db) ? db : 0 
+  };
 }
 
 /**
@@ -293,17 +425,27 @@ function computeGradient(points, a, b) {
  * @returns {{da: number, db: number}} Approximate gradient components
  */
 function computeGradientBatch(points, a, b, batchSize) {
-  if (points.length === 0) return { da: 0, db: 0 };
+  if (!points || points.length === 0) return { da: 0, db: 0 };
+  if (!isFinite(a) || !isFinite(b) || !isFinite(batchSize) || batchSize <= 0) {
+    return { da: 0, db: 0 };
+  }
+  
   const n = Math.min(batchSize, points.length);
   const indices = d3.shuffle(d3.range(points.length)).slice(0, n);
   let sumDa = 0, sumDb = 0;
   for (const idx of indices) {
     const d = points[idx];
+    if (!isFinite(d.x) || !isFinite(d.y)) continue;
     const err = d.y - (a * d.x + b);
     sumDa += err * (-d.x);
     sumDb += err * (-1);
   }
-  return { da: sumDa / n, db: sumDb / n };
+  const da = sumDa / n;
+  const db = sumDb / n;
+  return { 
+    da: isFinite(da) ? da : 0, 
+    db: isFinite(db) ? db : 0 
+  };
 }
 
 /**
@@ -397,7 +539,7 @@ function drawTrajectoryOnLandscape(g, trajectory, current, landscapeData) {
       .y(d => yOffset + bScale(d.b));
     g.append('path')
       .attr('d', lineGen(trajectory))
-      .attr('stroke', '#ff00ff')
+      .attr('stroke', COLORS.trajectory)
       .attr('stroke-width', 3)
       .attr('fill', 'none');
 
@@ -407,7 +549,7 @@ function drawTrajectoryOnLandscape(g, trajectory, current, landscapeData) {
       .attr('cx', d => xOffset + aScale(d.a))
       .attr('cy', d => yOffset + bScale(d.b))
       .attr('r', 2)
-      .attr('fill', '#ffffff');
+      .attr('fill', COLORS.trajectoryPoint);
   }
 
   // Draw current position
@@ -415,8 +557,8 @@ function drawTrajectoryOnLandscape(g, trajectory, current, landscapeData) {
     .attr('cx', xOffset + aScale(current.a))
     .attr('cy', yOffset + bScale(current.b))
     .attr('r', 6)
-    .attr('fill', '#ff00ff')
-    .attr('stroke', '#ffffff')
+    .attr('fill', COLORS.trajectory)
+    .attr('stroke', COLORS.trajectoryPoint)
     .attr('stroke-width', 2);
 }
 
@@ -425,10 +567,15 @@ function drawTrajectoryOnLandscape(g, trajectory, current, landscapeData) {
 // ============================================================================
 function initDataViz() {
   const svg = d3.select('#viz-data');
-  const width = 760, height = 400;
-  const margin = { top: 20, right: 20, bottom: 40, left: 50 };
+  const dims = VIZ_DIMENSIONS.data;
+  const width = dims.width;
+  const height = dims.height;
+  const margin = dims.margin;
 
   function generateData(n, sigma) {
+    if (!isFinite(n) || n < 1) n = 1;
+    if (!isFinite(sigma) || sigma < 0) sigma = 0;
+    
     const rng = d3.randomNormal.source(d3.randomLcg(Math.random()))(0, sigma);
     if (n === 1) return [{ x: 0, y: TRUE_A * 0 + TRUE_B + rng() }];
     // Sample n points uniformly in the range [sampleXMin, sampleXMax]
@@ -440,11 +587,16 @@ function initDataViz() {
   }
 
   function render() {
-    const n = parseInt(document.getElementById('dataPoints').value, 10);
-    noiseStdDev = parseFloat(document.getElementById('noiseSigma').value);
+    const dataPointsEl = getElement('dataPoints');
+    const noiseSigmaEl = getElement('noiseSigma');
+    if (!dataPointsEl || !noiseSigmaEl) return;
+    
+    const n = parseInt(dataPointsEl.value, 10);
+    noiseStdDev = parseFloat(noiseSigmaEl.value);
     currentDataPoints = generateData(n, noiseStdDev);
-    document.getElementById('dataPointsValue').textContent = String(n);
-    document.getElementById('noiseSigmaValue').textContent = noiseStdDev.toFixed(1);
+    
+    updateDisplay('dataPointsValue', n, 'int');
+    updateDisplay('noiseSigmaValue', noiseStdDev, 1);
 
     renderDataPlot({
       svg,
@@ -459,18 +611,23 @@ function initDataViz() {
     });
   }
 
-  document.getElementById('dataPoints').addEventListener('input', render);
-  document.getElementById('noiseSigma').addEventListener('input', () => {
-    document.getElementById('noiseSigmaValue').textContent = parseFloat(document.getElementById('noiseSigma').value).toFixed(1);
-    render(); // Trigger data regeneration when noise changes
-    window.dispatchEvent(new Event('dataUpdated'));
+  bindSlider('dataPoints', 'dataPointsValue', { format: 'int', onInput: render });
+  bindSlider('noiseSigma', 'noiseSigmaValue', { 
+    format: 1, 
+    onInput: (value) => {
+      render();
+      window.dispatchEvent(new Event('dataUpdated'));
+    }
   });
-  document.getElementById('sampleDataBtn').addEventListener('click', () => {
-    render();
-    // Trigger updates in other sections
-    const event = new Event('dataUpdated');
-    window.dispatchEvent(event);
-  });
+  
+  const sampleBtn = getElement('sampleDataBtn');
+  if (sampleBtn) {
+    sampleBtn.addEventListener('click', () => {
+      render();
+      window.dispatchEvent(new Event('dataUpdated'));
+    });
+  }
+  
   render();
 }
 
@@ -479,15 +636,17 @@ function initDataViz() {
 // ============================================================================
 function initAnnealedSGDViz() {
   const svg = d3.select('#viz-asgd');
-  const width = 760, height = 520;
-  const margin = { top: 30, right: 80, bottom: 50, left: 60 };
+  const dims = VIZ_DIMENSIONS.standard;
+  const width = dims.width;
+  const height = dims.height;
+  const margin = dims.margin;
   const w = width - margin.left - margin.right;
   const h = height - margin.top - margin.bottom;
 
   svg.attr('viewBox', `0 0 ${width} ${height}`);
   const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-  const aMin = 0.1, aMax = 0.7, bMin = 0.3, bMax = 0.9;
+  const { aMin, aMax, bMin, bMax } = PARAM_RANGES;
 
   function render() {
     if (currentDataPoints.length === 0) return;
@@ -588,7 +747,7 @@ function initAnnealedSGDViz() {
       }
       step();
       count++;
-    }, 30);
+    }, ANIMATION_INTERVAL);
   });
 
   document.getElementById('asgdAlpha0').addEventListener('input', () => {
@@ -663,14 +822,23 @@ function initAnnealedSGDViz() {
 // ============================================================================
 function initModelViz() {
   const svg = d3.select('#viz-model');
-  const width = 760, height = 520;
-  const margin = { top: 24, right: 24, bottom: 44, left: 56 };
+  const dims = VIZ_DIMENSIONS.model;
+  const width = dims.width;
+  const height = dims.height;
+  const margin = dims.margin;
 
   function render() {
-    const a = parseFloat(document.getElementById('modelA').value);
-    const b = parseFloat(document.getElementById('modelB').value);
-    document.getElementById('modelAValue').textContent = Number(a).toFixed(2);
-    document.getElementById('modelBValue').textContent = Number(b).toFixed(2);
+    const modelAEl = getElement('modelA');
+    const modelBEl = getElement('modelB');
+    if (!modelAEl || !modelBEl) return;
+    
+    const a = parseFloat(modelAEl.value);
+    const b = parseFloat(modelBEl.value);
+    
+    if (!isFinite(a) || !isFinite(b)) return;
+    
+    updateDisplay('modelAValue', a, 2);
+    updateDisplay('modelBValue', b, 2);
 
     renderDataPlot({
       svg,
@@ -690,16 +858,8 @@ function initModelViz() {
     });
   }
 
-  document.getElementById('modelA').addEventListener('input', () => {
-    const val = parseFloat(document.getElementById('modelA').value);
-    document.getElementById('modelAValue').textContent = val.toFixed(2);
-    render();
-  });
-  document.getElementById('modelB').addEventListener('input', () => {
-    const val = parseFloat(document.getElementById('modelB').value);
-    document.getElementById('modelBValue').textContent = val.toFixed(2);
-    render();
-  });
+  bindSlider('modelA', 'modelAValue', { format: 2, onInput: render });
+  bindSlider('modelB', 'modelBValue', { format: 2, onInput: render });
   window.addEventListener('dataUpdated', render);
   render();
 }
@@ -1256,7 +1416,7 @@ function initGDViz() {
       }
       step();
       count++;
-    }, 50);
+    }, ANIMATION_INTERVAL);
   });
 
   document.getElementById('gdAlpha').addEventListener('input', () => {
@@ -1387,7 +1547,7 @@ function initSGDViz() {
       }
       step();
       count++;
-    }, 30);
+    }, ANIMATION_INTERVAL);
   });
   document.getElementById('sgdAlpha').addEventListener('input', () => {
     document.getElementById('sgdAlphaValue').textContent = parseFloat(document.getElementById('sgdAlpha').value).toFixed(3);
@@ -1832,31 +1992,20 @@ function init() {
   initModelMinimizationViz();
   
   // Defer heavy computations to allow page to render
+  // Use single deferred call instead of multiple setTimeout chains
   setTimeout(() => {
     initLandscapeViz();
     initGradientEvalViz();
-  }, 10);
-  
-  setTimeout(() => {
     initSingleStepViz();
     initBatchLandscapesViz();
-  }, 50);
-  
-  setTimeout(() => {
     initGDViz();
     initSGDViz();
     initAnnealedSGDViz();
-  }, 100);
-  
-  setTimeout(() => {
     initGDCurvesViz();
     initSGDCurvesViz();
     initASGDCurvesViz();
-  }, 150);
-  
-  setTimeout(() => {
     initComplexLossViz();
-  }, 200);
+  }, 50);
 }
 
 if (document.readyState === 'loading') {

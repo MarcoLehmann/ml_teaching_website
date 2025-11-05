@@ -40,13 +40,13 @@
       <div class="controls">
         <label class="control">
           <span>Number of points: <strong id="dataPointsValue">5</strong></span>
-          <input id="dataPoints" type="range" min="1" max="10" step="1" value="7">
+          <input id="dataPoints" type="range" min="1" max="10" step="1" value="7" aria-label="Number of data points">
         </label>
         <label class="control">
           <span>Noise σ: <strong id="noiseSigmaValue">0.8</strong></span>
-          <input id="noiseSigma" type="range" min="0" max="1.2" step="0.1" value="0.8">
+          <input id="noiseSigma" type="range" min="0" max="1.2" step="0.1" value="0.8" aria-label="Noise standard deviation">
         </label>
-        <button id="sampleDataBtn" type="button">Sample Data</button>
+        <button id="sampleDataBtn" type="button" aria-label="Generate new data sample">Sample Data</button>
       </div>
       <div class="viz">
         <svg id="viz-data" width="760" height="400"></svg>
@@ -63,11 +63,11 @@
       <div class="controls">
         <label class="control">
           <span>a (slope): <strong id="modelAValue">0.4</strong></span>
-          <input id="modelA" type="range" min="-1.5" max="2.0" step="0.01" value="-0.1">
+          <input id="modelA" type="range" min="-1.5" max="2.0" step="0.01" value="-0.1" aria-label="Model slope parameter">
         </label>
         <label class="control">
           <span>b (intercept): <strong id="modelBValue">0.6</strong></span>
-          <input id="modelB" type="range" min="-1.0" max="1.5" step="0.01" value="1.0">
+          <input id="modelB" type="range" min="-1.0" max="1.5" step="0.01" value="1.0" aria-label="Model intercept parameter">
         </label>
       </div>
 
@@ -341,9 +341,9 @@
           <input id="gdIterations" type="range" min="1" max="500" step="1" value="100">
         </label>
         <div class="control buttons">
-          <button id="gdStepBtn" type="button">Single Step</button>
-          <button id="gdRunBtn" type="button">Run Gradient Descent</button>
-          <button id="gdResetBtn" type="button">Reset</button>
+          <button id="gdStepBtn" type="button" aria-label="Perform single gradient descent step">Single Step</button>
+          <button id="gdRunBtn" type="button" aria-label="Run gradient descent algorithm">Run Gradient Descent</button>
+          <button id="gdResetBtn" type="button" aria-label="Reset gradient descent">Reset</button>
         </div>
       </div>
       <div class="viz">
@@ -477,9 +477,9 @@
           <input id="sgdIterations" type="range" min="1" max="200" step="1" value="5">
         </label>
         <div class="control buttons">
-          <button id="sgdStepBtn" type="button">Single Step</button>
-          <button id="sgdRunBtn" type="button">Run SGD</button>
-          <button id="sgdResetBtn" type="button">Reset</button>
+          <button id="sgdStepBtn" type="button" aria-label="Perform single stochastic gradient descent step">Single Step</button>
+          <button id="sgdRunBtn" type="button" aria-label="Run stochastic gradient descent algorithm">Run SGD</button>
+          <button id="sgdResetBtn" type="button" aria-label="Reset stochastic gradient descent">Reset</button>
         </div>
       </div>
       <div class="viz">
@@ -546,7 +546,7 @@
           <span>Batch size: <strong id="batchSizeValue">3</strong></span>
           <input id="batchSizeViz" type="range" min="1" max="5" step="1" value="3">
         </label>
-        <button id="batchUpdateBtn" type="button">Sample new Batches</button>
+        <button id="batchUpdateBtn" type="button" aria-label="Generate new random batches">Sample new Batches</button>
       </div>
       <div class="batch-grid">
         <div class="viz">
@@ -615,9 +615,9 @@
           <input id="asgdIterations" type="range" min="1" max="2000" step="1" value="500">
         </label>
         <div class="control buttons">
-          <button id="asgdStepBtn" type="button">Single Step</button>
-          <button id="asgdRunBtn" type="button">Run ASGD</button>
-          <button id="asgdResetBtn" type="button">Reset</button>
+          <button id="asgdStepBtn" type="button" aria-label="Perform single annealed stochastic gradient descent step">Single Step</button>
+          <button id="asgdRunBtn" type="button" aria-label="Run annealed stochastic gradient descent algorithm">Run ASGD</button>
+          <button id="asgdResetBtn" type="button" aria-label="Reset annealed stochastic gradient descent">Reset</button>
         </div>
       </div>
       <div class="viz">
