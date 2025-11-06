@@ -55,6 +55,66 @@ const PARAM_RANGES = {
   bMax: 0.8
 };
 
+/**
+ * Initialize all a and b parameter sliders with values from PARAM_RANGES
+ * Note: This applies to optimization landscape sliders, not model fitting sliders
+ */
+function initParamSliders() {
+  // All 'a' parameter sliders for optimization algorithms
+  const aSliderIds = [
+    'gradEvalA',   // Evaluating the Gradient
+    'stepA0',      // Single Step
+    'gdA0',        // Gradient Descent
+    'sgdA0',       // Stochastic Gradient Descent
+    'batchA0',     // Batch Landscapes
+    'asgdA0',      // Annealed SGD
+    'plateauA0'    // Plateau SGD
+  ];
+  
+  // All 'b' parameter sliders for optimization algorithms
+  const bSliderIds = [
+    'gradEvalB',   // Evaluating the Gradient
+    'stepB0',      // Single Step
+    'gdB0',        // Gradient Descent
+    'sgdB0',       // Stochastic Gradient Descent
+    'batchB0',     // Batch Landscapes
+    'asgdB0',      // Annealed SGD
+    'plateauB0'    // Plateau SGD
+  ];
+  
+  // Set min/max for all 'a' parameter sliders and update display labels
+  aSliderIds.forEach(id => {
+    const slider = document.getElementById(id);
+    if (slider) {
+      slider.setAttribute('min', PARAM_RANGES.aMin);
+      slider.setAttribute('max', PARAM_RANGES.aMax);
+      
+      // Update the display label with current slider value
+      const displayId = id + 'Value';
+      const display = document.getElementById(displayId);
+      if (display) {
+        display.textContent = parseFloat(slider.value).toFixed(2);
+      }
+    }
+  });
+  
+  // Set min/max for all 'b' parameter sliders and update display labels
+  bSliderIds.forEach(id => {
+    const slider = document.getElementById(id);
+    if (slider) {
+      slider.setAttribute('min', PARAM_RANGES.bMin);
+      slider.setAttribute('max', PARAM_RANGES.bMax);
+      
+      // Update the display label with current slider value
+      const displayId = id + 'Value';
+      const display = document.getElementById(displayId);
+      if (display) {
+        display.textContent = parseFloat(slider.value).toFixed(2);
+      }
+    }
+  });
+}
+
 // Visualization dimensions and margins
 const VIZ_DIMENSIONS = {
   // Standard plot dimensions
@@ -793,7 +853,7 @@ function initAnnealedSGDViz() {
         .call(d3.axisBottom(x).ticks(5));
       gA.append('g').attr('class', 'axis').call(d3.axisLeft(y).ticks(5));
       gA.append('text').attr('x', w / 2).attr('y', -8).attr('text-anchor', 'middle')
-        .attr('fill', '#ffffff').attr('font-size', '15px').text('Learning Rate (α) over Iterations');
+        .attr('fill', '#ffffff').attr('font-size', '15px').text('Learning Rate α over Iterations');
       gA.append('text').attr('x', w / 2).attr('y', h + 40).attr('text-anchor', 'middle')
         .attr('fill', '#c9d4e5').attr('font-size', '13px').text('Iteration');
       gA.append('text').attr('x', w / 2).attr('y', h + 40).attr('text-anchor', 'middle');
@@ -1044,7 +1104,7 @@ function initPlateauSGDViz() {
         .call(d3.axisBottom(x).ticks(5));
       gA.append('g').attr('class', 'axis').call(d3.axisLeft(y).ticks(5));
       gA.append('text').attr('x', w / 2).attr('y', -8).attr('text-anchor', 'middle')
-        .attr('fill', '#ffffff').attr('font-size', '15px').text('Learning Rate (α) over Iterations');
+        .attr('fill', '#ffffff').attr('font-size', '15px').text('Learning Rate α over Iterations');
       gA.append('text').attr('x', w / 2).attr('y', h + 40).attr('text-anchor', 'middle')
         .attr('fill', '#c9d4e5').attr('font-size', '13px').text('Iteration');
       gA.append('text').attr('x', -h / 2).attr('y', -40).attr('text-anchor', 'middle')
@@ -2455,6 +2515,9 @@ function initGradientEvalViz() {
 // Initialize all sections
 // ============================================================================
 function init() {
+  // Initialize parameter sliders with PARAM_RANGES values
+  initParamSliders();
+  
   // Initialize light sections immediately (no expensive computations)
   initDataViz();
   initModelViz();
