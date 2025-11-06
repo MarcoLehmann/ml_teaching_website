@@ -1577,18 +1577,9 @@ function initSingleStepViz() {
     });
   }
 
-  document.getElementById('stepA0').addEventListener('input', () => {
-    document.getElementById('stepA0Value').textContent = parseFloat(document.getElementById('stepA0').value).toFixed(2);
-    render();
-  });
-  document.getElementById('stepB0').addEventListener('input', () => {
-    document.getElementById('stepB0Value').textContent = parseFloat(document.getElementById('stepB0').value).toFixed(2);
-    render();
-  });
-  document.getElementById('stepAlpha').addEventListener('input', () => {
-    document.getElementById('stepAlphaValue').textContent = parseFloat(document.getElementById('stepAlpha').value).toFixed(2);
-    render();
-  });
+  document.getElementById('stepA0').addEventListener('input', render);
+  document.getElementById('stepB0').addEventListener('input', render);
+  document.getElementById('stepAlpha').addEventListener('input', render);
   window.addEventListener('dataUpdated', render);
   render(); // Initial render after deferred init
 }
@@ -1751,14 +1742,8 @@ function initBatchLandscapesViz() {
     render();
   }
 
-  document.getElementById('batchA0').addEventListener('input', () => {
-    document.getElementById('batchA0Value').textContent = parseFloat(document.getElementById('batchA0').value).toFixed(2);
-    render();
-  });
-  document.getElementById('batchB0').addEventListener('input', () => {
-    document.getElementById('batchB0Value').textContent = parseFloat(document.getElementById('batchB0').value).toFixed(2);
-    render();
-  });
+  document.getElementById('batchA0').addEventListener('input', render);
+  document.getElementById('batchB0').addEventListener('input', render);
   document.getElementById('batchSizeViz').addEventListener('input', () => {
     document.getElementById('batchSizeValue').textContent = String(parseInt(document.getElementById('batchSizeViz').value, 10));
     regenerateBatches();
