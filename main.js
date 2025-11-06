@@ -39,7 +39,7 @@
 
 // True parameters for data generation
 const TRUE_A = 0.4;
-const TRUE_B = 0.3;
+const TRUE_B = 0.5;
 
 // Visualization domains
 const xDomain = [-5, 5];
