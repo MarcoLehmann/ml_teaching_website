@@ -1,6 +1,6 @@
 Simple D3 Visualizer: y = 0.4 x + 0.6 with Noisy Points
 
-This minimal webpage shows a thin green reference line y = 0.4 x + 0.6 and 1–10 green datapoints sampled with Gaussian noise around that line within x ∈ [-5, 5].
+This simple webpage shows a thin green reference line y = 0.4 x + 0.6 and 1–10 green datapoints sampled with Gaussian noise around that line within x ∈ [-5, 5].
 
 Run
 - Open index.html in your browser. No build step needed.
